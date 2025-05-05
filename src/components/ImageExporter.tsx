@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { FileMetadata } from "./types";
@@ -14,8 +13,6 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
   tooltips,
   baseUrl,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
   const exportImages = async () => {
     try {
       const zip = new JSZip();
@@ -40,8 +37,27 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
         // Draw the image
         ctx.drawImage(img, 0, 0);
 
+        // Extract coordinates from the filename
+        const filename = fileMetaData.images[i];
+        const match = filename.match(/click_\d+_([0-9.]+)_([0-9.]+)\.png$/);
+        let x, y;
+
+        if (match && match.length === 3) {
+          x = parseFloat(match[1]);
+          y = parseFloat(match[2]);
+          console.log(`Using filename coordinates for image ${i + 1}:`, {
+            x,
+            y,
+          });
+        } else {
+          // Fallback to point.x and point.y
+          x = point.x;
+          y = point.y;
+          console.log(`Using point coordinates for image ${i + 1}:`, { x, y });
+        }
+
         // Draw the tooltip
-        drawTooltip(ctx, point.x, point.y, tooltipText);
+        drawTooltip(ctx, x, y, tooltipText);
 
         // Convert canvas to blob and add to zip
         const blob = await new Promise<Blob>((resolve) =>
@@ -71,7 +87,7 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
     });
   };
 
-  // Draw tooltip on canvas
+  // Draw tooltip on canvas (updated positioning)
   const drawTooltip = (
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -93,11 +109,11 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
     const boxWidth = maxLineWidth + padding * 2;
     const boxHeight = lineHeight * textLines.length + padding * 2;
 
-    // Draw rounded rectangle for tooltip
+    // Draw rounded rectangle for tooltip (positioned above the point)
     roundRect(
       ctx,
       x - boxWidth / 2,
-      y - boxHeight - 20,
+      y - boxHeight - 10,
       boxWidth,
       boxHeight,
       5
@@ -109,16 +125,16 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
       ctx.fillText(
         line,
         x - boxWidth / 2 + padding,
-        y - boxHeight - 20 + padding + (i + 1) * lineHeight - 5
+        y - boxHeight - 10 + padding + (i + 1) * lineHeight - 5
       );
     });
 
     // Draw arrow
     ctx.fillStyle = "#4f46e5";
     ctx.beginPath();
-    ctx.moveTo(x - 10, y - 20);
-    ctx.lineTo(x + 10, y - 20);
-    ctx.lineTo(x, y - 5);
+    ctx.moveTo(x - 10, y - 10);
+    ctx.lineTo(x + 10, y - 10);
+    ctx.lineTo(x, y + 5);
     ctx.closePath();
     ctx.fill();
 
@@ -152,15 +168,12 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
   };
 
   return (
-    <>
-      <button
-        onClick={exportImages}
-        className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded transition-colors"
-      >
-        Export
-      </button>
-      <canvas ref={canvasRef} style={{ display: "none" }} />
-    </>
+    <button
+      onClick={exportImages}
+      className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded transition-colors"
+    >
+      Export
+    </button>
   );
 };
 

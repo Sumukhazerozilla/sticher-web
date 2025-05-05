@@ -5,26 +5,13 @@ interface TooltipProps {
   y: number;
   text: string;
   onTextUpdate: (text: string) => void;
-  imageWidth: number;
-  imageHeight: number;
 }
 
-const Tooltip: React.FC<TooltipProps> = ({
-  x,
-  y,
-  text,
-  onTextUpdate,
-  imageWidth,
-  imageHeight,
-}) => {
+const Tooltip: React.FC<TooltipProps> = ({ x, y, text, onTextUpdate }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(text);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  // Calculate position ratios in percentage
-  const posX = (x / imageWidth) * 100;
-  const posY = (y / imageHeight) * 100;
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -76,16 +63,17 @@ const Tooltip: React.FC<TooltipProps> = ({
 
   return (
     <div
-      ref={containerRef}
-      className="absolute z-10 transform -translate-x-1/2 -translate-y-full"
+      className="absolute"
       style={{
-        left: `${posX}%`,
-        top: `${posY}%`,
+        left: `${x}px`,
+        top: `${y}px`,
+        transform: "translate(-50%, -110%)", // Ensure tooltip appears above the point
+        zIndex: 50,
       }}
     >
-      <div className="flex flex-col items-center">
+      <div ref={containerRef} className="flex flex-col items-center">
         <div
-          className={`bg-indigo-600 text-white p-3 rounded-lg shadow-lg max-w-xs
+          className={`bg-indigo-600 text-white p-3 rounded-lg shadow-lg max-w-xs mb-2
             ${isEditing ? "border-2 border-white" : ""}`}
           onDoubleClick={handleDoubleClick}
         >
@@ -102,8 +90,10 @@ const Tooltip: React.FC<TooltipProps> = ({
             <p className="whitespace-pre-wrap">{text}</p>
           )}
         </div>
-        <div className="w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-indigo-600"></div>
-        <div className="w-3 h-3 rounded-full bg-red-500 border-2 border-white"></div>
+        {/* Arrow pointing down to the point */}
+        <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-indigo-600 mb-1"></div>
+        {/* Point indicator */}
+        <div className="w-3 h-3 absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rounded-full bg-red-500 border-2 border-white"></div>
       </div>
     </div>
   );

@@ -24,36 +24,100 @@ const SticherView: React.FC<SticherViewProps> = ({
     height: number;
   } | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const LARGE_IMAGE_URL = `${BASE_URL}${fileMetaData.images[activeImageIndex]}`;
   const currentPoint = fileMetaData.metadata.points[activeImageIndex];
 
   useEffect(() => {
-    if (imageRef.current && imageRef.current.complete) {
-      setImageSize({
-        width: imageRef.current.naturalWidth,
-        height: imageRef.current.naturalHeight,
-      });
+    // Update image size when it loads
+    const handleImageLoad = () => {
+      if (imageRef.current) {
+        setImageSize({
+          width: imageRef.current.naturalWidth,
+          height: imageRef.current.naturalHeight,
+        });
+      }
+    };
+
+    const img = imageRef.current;
+    if (img) {
+      if (img.complete) {
+        handleImageLoad();
+      } else {
+        img.addEventListener("load", handleImageLoad);
+        return () => img.removeEventListener("load", handleImageLoad);
+      }
     }
   }, [activeImageIndex]);
 
-  const handleImageLoad = () => {
-    if (imageRef.current) {
-      setImageSize({
-        width: imageRef.current.naturalWidth,
-        height: imageRef.current.naturalHeight,
-      });
+  useEffect(() => {
+    if (onUpdateTooltips) {
+      onUpdateTooltips(tooltips);
     }
-  };
+  }, [tooltips, onUpdateTooltips]);
 
   const handleTooltipUpdate = (id: number, text: string) => {
     const updatedTooltips = tooltips.map((tooltip) =>
       tooltip.id === id ? { ...tooltip, text } : tooltip
     );
     setTooltips(updatedTooltips);
-    if (onUpdateTooltips) {
-      onUpdateTooltips(updatedTooltips);
+  };
+
+  // Extract coordinates from filename
+  const extractCoordsFromFilename = (
+    filename: string
+  ): { x: number; y: number } | null => {
+    const match = filename.match(/click_\d+_([0-9.]+)_([0-9.]+)\.png$/);
+    if (match && match.length === 3) {
+      return {
+        x: parseFloat(match[1]),
+        y: parseFloat(match[2]),
+      };
     }
+    return null;
+  };
+
+  // Get tooltip position
+  const getTooltipPosition = () => {
+    if (!imageRef.current || !currentPoint || !imageSize) return null;
+
+    // Get the current image display dimensions
+    const imgDisplayRect = imageRef.current.getBoundingClientRect();
+
+    // Calculate ratio between natural image size and display size
+    const displayRatioWidth = imgDisplayRect.width / imageSize.width;
+    const displayRatioHeight = imgDisplayRect.height / imageSize.height;
+
+    // Try to get coordinates from the filename first (most accurate)
+    const filename = fileMetaData.images[activeImageIndex];
+    const filenameCoords = extractCoordsFromFilename(filename);
+
+    if (filenameCoords) {
+      // Apply display ratio to adjust coordinates based on current image display size
+      const adjustedX = filenameCoords.x * displayRatioWidth;
+      const adjustedY = filenameCoords.y * displayRatioHeight;
+
+      console.log("Using coordinates from filename:", {
+        original: filenameCoords,
+        adjusted: { x: adjustedX, y: adjustedY },
+        displayRatio: { width: displayRatioWidth, height: displayRatioHeight },
+      });
+
+      return { x: adjustedX, y: adjustedY };
+    }
+
+    // Fallback to using the point data directly
+    const x = currentPoint.x * displayRatioWidth;
+    const y = currentPoint.y * displayRatioHeight;
+
+    console.log("Using direct point coordinates:", {
+      original: { x: currentPoint.x, y: currentPoint.y },
+      adjusted: { x, y },
+      displayRatio: { width: displayRatioWidth, height: displayRatioHeight },
+    });
+
+    return { x, y };
   };
 
   return (
@@ -86,27 +150,37 @@ const SticherView: React.FC<SticherViewProps> = ({
         ) : null}
       </div>
 
-      <div className="pt-1 relative">
-        <img
-          ref={imageRef}
-          src={LARGE_IMAGE_URL}
-          alt="Selected screenshot"
-          className="max-w-full"
-          onLoad={handleImageLoad}
-        />
-
-        {imageSize && currentPoint && (
-          <Tooltip
-            x={currentPoint.x}
-            y={currentPoint.y}
-            text={
-              tooltips[activeImageIndex]?.text || `Note ${activeImageIndex + 1}`
-            }
-            onTextUpdate={(text) => handleTooltipUpdate(activeImageIndex, text)}
-            imageWidth={imageSize.width}
-            imageHeight={imageSize.height}
+      <div ref={containerRef} className="pt-1 relative overflow-auto">
+        <div className="relative inline-block">
+          <img
+            ref={imageRef}
+            src={LARGE_IMAGE_URL}
+            alt="Selected screenshot"
+            className="max-w-full"
           />
-        )}
+
+          {imageRef.current &&
+            currentPoint &&
+            imageSize &&
+            (() => {
+              const position = getTooltipPosition();
+              if (!position) return null;
+
+              return (
+                <Tooltip
+                  x={position.x}
+                  y={position.y}
+                  text={
+                    tooltips[activeImageIndex]?.text ||
+                    `Note ${activeImageIndex + 1}`
+                  }
+                  onTextUpdate={(text) =>
+                    handleTooltipUpdate(activeImageIndex, text)
+                  }
+                />
+              );
+            })()}
+        </div>
       </div>
     </div>
   );

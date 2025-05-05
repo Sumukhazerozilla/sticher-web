@@ -4,9 +4,17 @@ export interface FileMetadata {
     points: {
       x: number;
       y: number;
+      originalX?: number;
+      originalY?: number;
       time: number;
       button: number;
       relativeTime: number;
+      domBounds?: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
     }[];
     lastRecording: {
       startTime: number;
