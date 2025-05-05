@@ -1,7 +1,11 @@
 import { useState } from "react";
 import UploadModal from "./UploadModal";
 
-const UploadButton = () => {
+interface UploadButtonProps {
+  onFileUpload: (file: File) => Promise<void>;
+}
+
+const UploadButton: React.FC<UploadButtonProps> = ({ onFileUpload }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const openModal = () => setIsModalOpen(true);
@@ -15,7 +19,9 @@ const UploadButton = () => {
       >
         Upload
       </button>
-      {isModalOpen && <UploadModal onClose={closeModal} />}
+      {isModalOpen && (
+        <UploadModal onClose={closeModal} onFileUpload={onFileUpload} />
+      )}
     </div>
   );
 };

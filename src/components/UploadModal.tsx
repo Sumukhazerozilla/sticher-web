@@ -1,12 +1,12 @@
 import { useState, useCallback } from "react";
-import axios from "axios";
 import { useDropzone } from "react-dropzone";
 
 interface UploadModalProps {
   onClose: () => void;
+  onFileUpload: (file: File) => Promise<void>;
 }
 
-const UploadModal = ({ onClose }: UploadModalProps) => {
+const UploadModal = ({ onClose, onFileUpload }: UploadModalProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -31,24 +31,10 @@ const UploadModal = ({ onClose }: UploadModalProps) => {
       return;
     }
 
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append("zipFile", selectedFile);
-
     try {
-      // Replace with your actual API endpoint
-      const response = await axios.post(
-        "https://api.example.com/upload",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      setIsUploading(true);
 
-      console.log("Upload successful:", response.data);
-      alert("File uploaded successfully!");
+      await onFileUpload(selectedFile);
       onClose();
     } catch (error) {
       console.error("Upload failed:", error);
