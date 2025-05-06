@@ -73,11 +73,13 @@ function App() {
       <div className="flex items-center justify-end gap-2">
         <UploadButton onFileUpload={onFileUpload} />
         <div>
-          <ImageExporter
-            fileMetaData={data}
-            tooltips={tooltips}
-            baseUrl={BASE_URL}
-          />
+          {data && (
+            <ImageExporter
+              fileMetaData={data}
+              tooltips={tooltips}
+              baseUrl={BASE_URL}
+            />
+          )}
         </div>
       </div>
       <section>

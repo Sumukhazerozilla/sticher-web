@@ -1,9 +1,12 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { FileMetadata } from "./types";
+import { IResponse } from "./types";
+import { demoHtml } from "./templates/demo";
+import { BASE_URL } from "./constants";
+import axios from "axios";
 
 interface ImageExporterProps {
-  fileMetaData: FileMetadata;
+  fileMetaData: IResponse;
   tooltips: { id: number; text: string }[];
   baseUrl: string;
 }
@@ -13,68 +16,92 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
   tooltips,
   baseUrl,
 }) => {
-  const exportImages = async () => {
+  const handleExportBtn = async () => {
     try {
       const zip = new JSZip();
-      const folder = zip.folder("annotated_images") || zip;
-
-      // For each image in the file metadata
-      for (let i = 0; i < fileMetaData.images.length; i++) {
-        const imageUrl = `${baseUrl}${fileMetaData.images[i]}`;
-        const tooltipText = tooltips[i]?.text || `Note ${i + 1}`;
-        const point = fileMetaData.metadata.points[i];
-
-        // Create canvas with image and tooltip
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        if (!ctx) continue;
-
-        // Load the image
-        const img = await loadImage(imageUrl);
-        canvas.width = img.width;
-        canvas.height = img.height;
-
-        // Draw the image
-        ctx.drawImage(img, 0, 0);
-
-        // Extract coordinates from the filename
-        const filename = fileMetaData.images[i];
-        const match = filename.match(/click_\d+_([0-9.]+)_([0-9.]+)\.png$/);
-        let x, y;
-
-        if (match && match.length === 3) {
-          x = parseFloat(match[1]);
-          y = parseFloat(match[2]);
-          console.log(`Using filename coordinates for image ${i + 1}:`, {
-            x,
-            y,
-          });
-        } else {
-          // Fallback to point.x and point.y
-          x = point.x;
-          y = point.y;
-          console.log(`Using point coordinates for image ${i + 1}:`, { x, y });
-        }
-
-        // Draw the tooltip
-        drawTooltip(ctx, x, y, tooltipText);
-
-        // Convert canvas to blob and add to zip
-        const blob = await new Promise<Blob>((resolve) =>
-          canvas.toBlob((blob) => resolve(blob as Blob), "image/png")
-        );
-
-        folder.file(`image_${i + 1}.png`, blob);
-      }
+      await addAnnotatedImageToZip(zip);
+      await demoHtml(fileMetaData, zip);
+      await exportImagesToZip(zip, fileMetaData);
 
       // Generate and save the zip file
       const content = await zip.generateAsync({ type: "blob" });
-      saveAs(content, "annotated_images.zip");
+      saveAs(content, "screen_recording.zip");
     } catch (error) {
       console.error("Error exporting images:", error);
       alert("Failed to export images. Please try again.");
     }
   };
+
+  async function exportImagesToZip(zip: JSZip, response: IResponse) {
+    // Create a resource folder for images
+    const resourceFolder = zip.folder("resources") || zip;
+    // Download and add each image to the ZIP
+    for (const imagePath of response.images) {
+      try {
+        const imageUrl = `${BASE_URL}${imagePath}`;
+        const imageResponse = await axios.get(imageUrl, {
+          responseType: "arraybuffer",
+        });
+        const imageFileName = imagePath.split("/").pop() || "image.png";
+        resourceFolder.file(imageFileName, imageResponse.data);
+      } catch (error) {
+        console.error(`Failed to fetch image: ${imagePath}`, error);
+      }
+    }
+  }
+
+  async function addAnnotatedImageToZip(zip: JSZip) {
+    const taggedImageFolder = zip.folder("annotated_images") || zip;
+
+    // For each image in the file metadata
+    for (let i = 0; i < fileMetaData.images.length; i++) {
+      const imageUrl = `${baseUrl}${fileMetaData.images[i]}`;
+      const tooltipText = tooltips[i]?.text || `Note ${i + 1}`;
+      const point = fileMetaData.metadata.points[i];
+
+      // Create canvas with image and tooltip
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) continue;
+
+      // Load the image
+      const img = await loadImage(imageUrl);
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // Draw the image
+      ctx.drawImage(img, 0, 0);
+
+      // Extract coordinates from the filename
+      const filename = fileMetaData.images[i];
+      const match = filename.match(/click_\d+_([0-9.]+)_([0-9.]+)\.png$/);
+      let x, y;
+
+      if (match && match.length === 3) {
+        x = parseFloat(match[1]);
+        y = parseFloat(match[2]);
+        console.log(`Using filename coordinates for image ${i + 1}:`, {
+          x,
+          y,
+        });
+      } else {
+        // Fallback to point.x and point.y
+        x = point.x;
+        y = point.y;
+        console.log(`Using point coordinates for image ${i + 1}:`, { x, y });
+      }
+
+      // Draw the tooltip
+      drawTooltip(ctx, x, y, tooltipText);
+
+      // Convert canvas to blob and add to zip
+      const blob = await new Promise<Blob>((resolve) =>
+        canvas.toBlob((blob) => resolve(blob as Blob), "image/png")
+      );
+
+      taggedImageFolder.file(`image_${i + 1}.png`, blob);
+    }
+  }
 
   // Helper function to load an image
   const loadImage = (src: string): Promise<HTMLImageElement> => {
@@ -169,7 +196,7 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
 
   return (
     <button
-      onClick={exportImages}
+      onClick={handleExportBtn}
       className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded transition-colors"
     >
       Export
