@@ -67,8 +67,8 @@ const Tooltip: React.FC<TooltipProps> = ({ x, y, text, onTextUpdate }) => {
       style={{
         left: `${x}px`,
         top: `${y}px`,
-        transform: "translate(-50%, -110%)", // Ensure tooltip appears above the point
-        zIndex: 50,
+        transform: `translate(${determineHorizontalPosition(x)}, -110%)`, // Adjust horizontal position based on proximity to edges
+        zIndex: isEditing ? 1000 : 50, // Higher z-index when editing
       }}
     >
       <div ref={containerRef} className="flex flex-col items-center">
@@ -98,5 +98,23 @@ const Tooltip: React.FC<TooltipProps> = ({ x, y, text, onTextUpdate }) => {
     </div>
   );
 };
+
+// Helper function to determine horizontal position based on proximity to edges
+function determineHorizontalPosition(x: number): string {
+  const imageWidth =
+    document.querySelector('img[alt="Selected screenshot"]')?.clientWidth || 0;
+  const MARGIN = 150; // Minimum distance from edge
+
+  if (x < MARGIN) {
+    // Near left edge, shift tooltip to the right
+    return "-20%";
+  } else if (imageWidth - x < MARGIN) {
+    // Near right edge, shift tooltip to the left
+    return "-80%";
+  }
+
+  // Default center position
+  return "-50%";
+}
 
 export default Tooltip;
