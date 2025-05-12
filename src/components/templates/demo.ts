@@ -95,6 +95,33 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                 border-left: 3px solid #0066cc;
                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             }
+            /* Cursor style */
+            .cursor {
+                position: absolute;
+                width: 24px;
+                height: 24px;
+                background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M5.2,3.449L17.357,15.605l-4.511,0.439L9.66,20.551l-1.543-4.438L5.2,3.449z" fill="white" stroke="black" stroke-width="1.2"/></svg>');
+                background-size: contain;
+                background-repeat: no-repeat;
+                pointer-events: none;
+                z-index: 1000;
+                transform: translate(-3px, -3px);
+                opacity: 0.9;
+                transition: opacity 0.2s ease;
+            }
+            .cursor.click {
+                animation: click-animation 0.5s ease-out;
+            }
+            @keyframes click-animation {
+                0% { transform: translate(-3px, -3px) scale(1); }
+                50% { transform: translate(-3px, -3px) scale(1.5); }
+                100% { transform: translate(-3px, -3px) scale(1); }
+            }
+            /* Figure container needs position relative for proper cursor positioning */
+            figure {
+                position: relative;
+                overflow: hidden;
+            }
             /* Timeline/Tracker Styles */
             .timeline-container {
                 position: fixed;
@@ -167,6 +194,25 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                 cursor: pointer;
                 accent-color: #ff9800;
             }
+            /* Playback speed control */
+            .speed-control {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                margin-right: 10px;
+            }
+            .speed-label {
+                color: white;
+                font-size: 0.8rem;
+            }
+            .speed-selector {
+                background: rgba(255, 255, 255, 0.1);
+                color: white;
+                border: none;
+                border-radius: 3px;
+                padding: 2px 5px;
+                font-size: 0.8rem;
+            }
         </style>
     </head>
     <body>
@@ -180,7 +226,9 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     <h2>Table of content</h2>
                     <div class="aside_container"></div>
                 </aside>
-                <figure></figure>
+                <figure>
+                    <div class="cursor" style="display: none;"></div>
+                </figure>
             </div>
 
             <!-- Timeline/Tracker Container -->
@@ -196,6 +244,15 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                         <span class="time-display">00:00 / 05:00</span>
                     </div>
                     <div class="timeline-right-controls">
+                        <div class="speed-control">
+                            <span class="speed-label">Speed:</span>
+                            <select class="speed-selector">
+                                <option value="0.5">0.5x</option>
+                                <option value="1" selected>1x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="2">2x</option>
+                            </select>
+                        </div>
                         <div class="volume-control">
                             <button class="control-button volume-button">🔊</button>
                             <input
@@ -225,6 +282,9 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
             // Get recording metadata for accurate timeline
             const recordingData = apiResponse.metadata.lastRecording;
             const clickPoints = apiResponse.metadata.points;
+            
+            // Get cursor movement data
+            const cursorMovements = apiResponse.metadata?.cursorMovement?.movements || [];
 
             class DemoHtml {
                 constructor(baseUrl, images, asideSelector, figureSelector, apiData) {
@@ -232,6 +292,7 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     this.apiData = apiData;
                     this.recordingData = apiData.metadata.lastRecording;
                     this.clickPoints = apiData.metadata.points;
+                    this.cursorMovements = apiData.metadata?.cursorMovement?.movements || [];
 
                     this.startTime = this.recordingData.startTime;
                     this.endTime = this.recordingData.endTime;
@@ -243,6 +304,7 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     this.$_aside = document.querySelector(asideSelector);
                     this.$_figure = document.querySelector(figureSelector);
                     this.$_figure_img = null;
+                    this.$_cursor = document.querySelector(".cursor");
 
                     // Timeline elements
                     this.$_playPauseButton = document.querySelector(".play-pause-button");
@@ -250,6 +312,7 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     this.$_nextButton = document.querySelector(".next-button");
                     this.$_volumeButton = document.querySelector(".volume-button");
                     this.$_volumeSlider = document.querySelector(".volume-slider");
+                    this.$_speedSelector = document.querySelector(".speed-selector");
                     this.$_timeline = document.querySelector(".timeline");
                     this.$_timelineProgress = document.querySelector(".timeline-progress");
 
@@ -262,12 +325,17 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     ); // Initialize with actual recording duration
                     this.volume = 100;
                     this.muted = false;
+                    this.playbackSpeed = 1;
 
                     // Animation state
                     this.animationFrame = null;
                     this.playbackStartTime = 0;
                     this.currentPlaybackTime = 0;
                     this.totalDuration = (this.recordingData.endTime - this.recordingData.startTime) / 1000;
+                    
+                    // Cursor movement state
+                    this.lastCursorPosition = { x: 0, y: 0 };
+                    this.nextClickIndex = 0;
 
                     // Create a timeline based on clickpoints for smooth transitions
                     this.timelinePoints = this.clickPoints.map((point) => ({
@@ -286,6 +354,109 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     this.renderFigure();
                     this.addEventListeners();
                     this.initializeTimelineControls();
+                    
+                    // Setup cursor if we have movement data
+                    if (this.cursorMovements.length > 0) {
+                        this.setupCursor();
+                    }
+                }
+                
+                setupCursor() {
+                    if (!this.$_cursor) return;
+                    this.$_cursor.style.display = "block";
+                    
+                    // Position cursor at the initial movement position
+                    if (this.cursorMovements.length > 0) {
+                        const initialMovement = this.cursorMovements[0];
+                        this.lastCursorPosition = {
+                            x: initialMovement.x,
+                            y: initialMovement.y
+                        };
+                    }
+                }
+                
+                // Update cursor position based on current playback time
+                updateCursorPosition(currentTime) {
+                    if (!this.$_cursor || this.cursorMovements.length === 0) return;
+                    
+                    // Convert to milliseconds for comparison with relativeTime
+                    const timeMs = currentTime * 1000;
+                    
+                    // Find the movement data points that surround the current time
+                    let prevMovement = this.cursorMovements[0];
+                    let nextMovement = null;
+                    
+                    for (let i = 0; i < this.cursorMovements.length; i++) {
+                        if (this.cursorMovements[i].relativeTime <= timeMs) {
+                            prevMovement = this.cursorMovements[i];
+                            nextMovement = this.cursorMovements[i + 1] || null;
+                        } else {
+                            nextMovement = this.cursorMovements[i];
+                            break;
+                        }
+                    }
+                    
+                    // Check for click events
+                    while (this.nextClickIndex < this.clickPoints.length &&
+                           this.clickPoints[this.nextClickIndex].relativeTime <= timeMs) {
+                        // Trigger click animation
+                        this.animateCursorClick();
+                        this.nextClickIndex++;
+                    }
+                    
+                    // If we found both a previous and next movement, interpolate position
+                    if (prevMovement && nextMovement) {
+                        const prevTime = prevMovement.relativeTime;
+                        const nextTime = nextMovement.relativeTime;
+                        const timeDiff = nextTime - prevTime;
+                        
+                        // If there's a time difference, interpolate
+                        if (timeDiff > 0) {
+                            const ratio = (timeMs - prevTime) / timeDiff;
+                            const x = prevMovement.x + (nextMovement.x - prevMovement.x) * ratio;
+                            const y = prevMovement.y + (nextMovement.y - prevMovement.y) * ratio;
+                            
+                            // Get the image element for proper positioning
+                            const imgElement = this.$_figure.querySelector('img');
+                            if (!imgElement) return;
+                            
+                            // Calculate scaling factors based on image dimensions vs original screen size
+                            const scaleX = imgElement.clientWidth / this.recordingData.screenSize.width;
+                            const scaleY = imgElement.clientHeight / this.recordingData.screenSize.height;
+                            
+                            // Position cursor relative to the image, not the window
+                            this.$_cursor.style.left = \`\${x * scaleX}px\`;
+                            this.$_cursor.style.top = \`\${y * scaleY}px\`;
+                            
+                            this.lastCursorPosition = { x, y };
+                        }
+                    } else if (prevMovement) {
+                        // If we only have a previous movement, use that position
+                        const imgElement = this.$_figure.querySelector('img');
+                        if (!imgElement) return;
+                        
+                        const scaleX = imgElement.clientWidth / this.recordingData.screenSize.width;
+                        const scaleY = imgElement.clientHeight / this.recordingData.screenSize.height;
+                        
+                        this.$_cursor.style.left = \`\${prevMovement.x * scaleX}px\`;
+                        this.$_cursor.style.top = \`\${prevMovement.y * scaleY}px\`;
+                        
+                        this.lastCursorPosition = { x: prevMovement.x, y: prevMovement.y };
+                    }
+                }
+                
+                // Animate cursor click effect
+                animateCursorClick() {
+                    if (!this.$_cursor) return;
+                    
+                    // Remove existing click class to reset animation
+                    this.$_cursor.classList.remove('click');
+                    
+                    // Force reflow to allow animation to restart
+                    void this.$_cursor.offsetWidth;
+                    
+                    // Add click class to trigger animation
+                    this.$_cursor.classList.add('click');
                 }
 
                 renderAside() {
@@ -317,10 +488,17 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                 }
 
                 renderFigure() {
-                    this.$_figure.innerHTML = \`<img src="\${
-                        this.images[this.activeImageIndex]
-                    }" alt="Image \${this.activeImageIndex}" />\`;
+                    // Create the figure content with both image and cursor inside
+                    this.$_figure.innerHTML = \`
+                        <img src="\${this.images[this.activeImageIndex]}" alt="Image \${this.activeImageIndex}" />
+                        <div class="cursor" style="\${this.cursorMovements.length > 0 ? '' : 'display: none;'}"></div>
+                    \`;
                     this.$_figure_img = this.$_figure.querySelector("img");
+                    this.$_cursor = this.$_figure.querySelector(".cursor");
+                    
+                    if (this.cursorMovements.length > 0) {
+                        this.setupCursor();
+                    }
                 }
 
                 addEventListeners() {
@@ -342,13 +520,35 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                             if (this.isPlaying) {
                                 this.currentPlaybackTime = time;
                                 this.playbackStartTime = Date.now();
+                                
+                                // Reset click index for proper cursor click animation
+                                this.nextClickIndex = index;
                             }
 
                             // Update progress bar to match the time of this slide
                             this.updateProgressBarByTime(time);
+                            
+                            // Update cursor position
+                            this.updateCursorPosition(time);
                         }
 
                         this.updateFigure(index);
+                    });
+                    
+                    // Add speed selector change event listener
+                    this.$_speedSelector.addEventListener("change", (e) => {
+                        this.playbackSpeed = parseFloat(e.target.value);
+                        
+                        // If currently playing, adjust the playback timing
+                        if (this.isPlaying) {
+                            // Save current time
+                            const currentTime = this.currentPlaybackTime + 
+                                ((Date.now() - this.playbackStartTime) / 1000) * this.playbackSpeed;
+                                
+                            // Reset playback start time with new speed
+                            this.currentPlaybackTime = currentTime;
+                            this.playbackStartTime = Date.now();
+                        }
                     });
                 }
 
@@ -402,9 +602,15 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                         if (this.isPlaying) {
                             this.currentPlaybackTime = targetTime;
                             this.playbackStartTime = Date.now();
+                            
+                            // Reset click index for proper cursor animation
+                            this.resetClickIndexForTime(targetTime);
                         }
 
                         this.goToSlideByTime(targetTime);
+                        
+                        // Update cursor position
+                        this.updateCursorPosition(targetTime);
                     });
 
                     // Fullscreen button
@@ -423,6 +629,21 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     // Initialize time display
                     this.updateProgressBar();
                 }
+                
+                // Reset click index based on the current time
+                resetClickIndexForTime(time) {
+                    // Convert time to milliseconds
+                    const timeMs = time * 1000;
+                    this.nextClickIndex = 0;
+                    
+                    for (let i = 0; i < this.clickPoints.length; i++) {
+                        if (this.clickPoints[i].relativeTime < timeMs) {
+                            this.nextClickIndex = i + 1;
+                        } else {
+                            break;
+                        }
+                    }
+                }
 
                 togglePlayPause() {
                     if (this.isPlaying) {
@@ -438,9 +659,13 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
 
                     // Store the current time as reference
                     this.playbackStartTime = Date.now();
-                    this.currentPlaybackTime = this.getCurrentTimeFromIndex(
-                        this.activeImageIndex
-                    );
+                    
+                    // If we're at the end, restart from beginning
+                    if (this.currentPlaybackTime >= this.totalDuration) {
+                        this.currentPlaybackTime = 0;
+                        this.goToSlideByTime(0);
+                        this.resetClickIndexForTime(0);
+                    }
 
                     // Use requestAnimationFrame for smooth playback
                     this.animatePlayback();
@@ -458,8 +683,8 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                 }
 
                 animatePlayback() {
-                    // Calculate elapsed time since playback started
-                    const elapsedTime = (Date.now() - this.playbackStartTime) / 1000;
+                    // Calculate elapsed time since playback started, adjusted for playback speed
+                    const elapsedTime = (Date.now() - this.playbackStartTime) / 1000 * this.playbackSpeed;
                     const currentTime = this.currentPlaybackTime + elapsedTime;
 
                     // Check if we've reached the end of the recording
@@ -468,9 +693,13 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                         this.playbackStartTime = Date.now();
                         this.currentPlaybackTime = 0;
                         this.goToSlideByTime(0);
+                        this.resetClickIndexForTime(0);
                     } else {
                         // Update display based on current time
                         this.goToSlideByTime(currentTime);
+                        
+                        // Update cursor position
+                        this.updateCursorPosition(currentTime);
                     }
 
                     // Continue animation
@@ -559,12 +788,20 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     if (this.isPlaying && updateTime) {
                         this.currentPlaybackTime = this.getCurrentTimeFromIndex(index);
                         this.playbackStartTime = Date.now();
+                        
+                        // Reset click index for proper cursor animation
+                        this.resetClickIndexForTime(this.currentPlaybackTime);
                     }
 
                     // Update timeline to reflect the current slide
                     const clickPoint = this.clickPoints[index];
                     if (clickPoint) {
                         this.updateProgressBarByTime(clickPoint.relativeTime / 1000);
+                        
+                        // Update cursor position
+                        if (this.cursorMovements.length > 0) {
+                            this.updateCursorPosition(clickPoint.relativeTime / 1000);
+                        }
                     }
                 }
 

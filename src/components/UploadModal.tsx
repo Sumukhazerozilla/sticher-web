@@ -45,7 +45,7 @@ const UploadModal = ({ onClose, onFileUpload }: UploadModalProps) => {
   };
 
   return (
-    <div className="fixed inset-0 backdrop:bg-black backdrop-opacity-10 flex justify-center items-center z-50 text-white">
+    <div className="fixed inset-0 backdrop:bg-black backdrop-opacity-10 flex justify-center items-center z-[999999999] text-white">
       <div className="bg-gray-800 rounded-lg w-full max-w-lg shadow-xl">
         <div className="flex justify-between items-center p-4 border-b border-gray-700">
           <h2 className="text-xl font-semibold">Upload ZIP File</h2>
