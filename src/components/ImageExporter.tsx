@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { IResponse } from "./types";
 import { demoHtml } from "./templates/demo";
+import { testHtml } from "./templates/test"; // Import the testHtml function
 import { BASE_URL } from "./constants";
 import axios from "axios";
 
@@ -19,9 +20,16 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
   const handleExportBtn = async () => {
     try {
       const zip = new JSZip();
-      await addAnnotatedImageToZip(zip);
-      await demoHtml(fileMetaData, zip);
+
+      // First, export the original images to the resources folder
       await exportImagesToZip(zip, fileMetaData);
+
+      // Then, create the annotated images
+      await addAnnotatedImageToZip(zip);
+
+      // Finally, create the HTML files after all resources are available
+      await demoHtml(fileMetaData, zip);
+      await testHtml(fileMetaData, zip);
 
       // Generate and save the zip file
       const content = await zip.generateAsync({ type: "blob" });

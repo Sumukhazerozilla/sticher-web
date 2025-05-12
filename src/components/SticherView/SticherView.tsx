@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { BASE_URL } from "../constants";
-import { FileMetadata } from "../types";
+import { IResponse } from "../types";
 import Tooltip from "./Tooltip";
 
 interface SticherViewProps {
-  fileMetaData: FileMetadata;
+  fileMetaData: IResponse;
   onUpdateTooltips?: (tooltips: { id: number; text: string }[]) => void;
 }
 
