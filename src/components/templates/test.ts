@@ -192,12 +192,41 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                 padding: 2px 5px;
                 font-size: 0.8rem;
             }
+            /* Feedback tooltip styles */
+            .feedback-tooltip {
+                position: absolute;
+                background-color: rgba(0, 0, 0, 0.7);
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 14px;
+                pointer-events: none;
+                z-index: 100;
+                transition: opacity 0.3s ease;
+                opacity: 0;
+            }
+            
+            .feedback-tooltip.correct {
+                background-color: rgba(22, 163, 74, 0.8);
+            }
+            
+            .feedback-tooltip.wrong {
+                background-color: rgba(220, 38, 38, 0.8);
+            }
+            
+            .feedback-tooltip.visible {
+                opacity: 1;
+            }
+            
+            figure.clickable {
+                cursor: crosshair;
+            }
         </style>
     </head>
     <body>
         <main>
             <header>
-                <h1>Screen Recording Viewer (Static)</h1>
+                <h1>Screen Recording Viewer (Interactive)</h1>
             </header>
 
             <div class="container">
@@ -205,8 +234,9 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     <h2>Table of content</h2>
                     <div class="aside_container"></div>
                 </aside>
-                <figure>
+                <figure class="clickable">
                     <!-- No cursor element here -->
+                    <div class="feedback-tooltip"></div>
                 </figure>
             </div>
 
@@ -316,6 +346,12 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     // Sort timeline points by time
                     this.timelinePoints.sort((a, b) => a.time - b.time);
 
+                    // Feedback tooltip element
+                    this.$_feedbackTooltip = null;
+                    
+                    // Define tolerance for clicks (in pixels)
+                    this.clickTolerance = 30;
+
                     this.init();
                 }
 
@@ -324,6 +360,7 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     this.renderFigure();
                     this.addEventListeners();
                     this.initializeTimelineControls();
+                    this.addClickInteractions();
                 }
 
                 renderAside() {
@@ -355,11 +392,13 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                 }
 
                 renderFigure() {
-                    // Create the figure content with image only
+                    // Create the figure content with image and feedback tooltip
                     this.$_figure.innerHTML = \`
                         <img src="\${this.images[this.activeImageIndex]}" alt="Image \${this.activeImageIndex}" />
+                        <div class="feedback-tooltip"></div>
                     \`;
                     this.$_figure_img = this.$_figure.querySelector("img");
+                    this.$_feedbackTooltip = this.$_figure.querySelector('.feedback-tooltip');
                 }
 
                 addEventListeners() {
@@ -418,6 +457,11 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     this.activeImageIndex = parseInt(index);
                     this.$_figure_img.src = this.images[index];
                     this.$_figure_img.alt = \`Image \${index}\`;
+
+                    // Hide feedback tooltip when changing slides
+                    if (this.$_feedbackTooltip) {
+                        this.$_feedbackTooltip.classList.remove('visible');
+                    }
 
                     // Update timeline progress when figure changes
                     this.updateProgressBar();
@@ -681,6 +725,79 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     return \`\${mins.toString().padStart(2, "0")}:\${secs
                         .toString()
                         .padStart(2, "0")}\`;
+                }
+
+                addClickInteractions() {
+                    // Add click event listener to the figure element
+                    this.$_figure.addEventListener('click', (e) => this.handleImageClick(e));
+                    
+                    // Initialize feedback tooltip
+                    this.$_feedbackTooltip = this.$_figure.querySelector('.feedback-tooltip');
+                }
+                
+                handleImageClick(e) {
+                    // Get click coordinates relative to the image
+                    const imgElement = this.$_figure.querySelector('img');
+                    if (!imgElement) return;
+                    
+                    const rect = imgElement.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    
+                    // Calculate percentage coordinates relative to image size
+                    const xPercent = x / rect.width;
+                    const yPercent = y / rect.height;
+                    
+                    // Convert to screen coordinates
+                    const screenX = xPercent * this.recordingData.screenSize.width;
+                    const screenY = yPercent * this.recordingData.screenSize.height;
+                    
+                    // Get the expected click point from metadata
+                    const expectedPoint = this.clickPoints[this.activeImageIndex];
+                    
+                    // Check if click is within tolerance
+                    const isCorrect = this.isClickCorrect(screenX, screenY, expectedPoint);
+                    
+                    // Show feedback tooltip
+                    this.showFeedback(isCorrect, x, y);
+                    
+                    // Move to next slide after a delay, regardless of right/wrong
+                    setTimeout(() => {
+                        this.nextSlide();
+                    }, 1000);
+                }
+                
+                isClickCorrect(clickX, clickY, expectedPoint) {
+                    if (!expectedPoint) return false;
+                    
+                    // Calculate distance between clicked point and expected point
+                    const distance = Math.sqrt(
+                        Math.pow(clickX - expectedPoint.x, 2) + 
+                        Math.pow(clickY - expectedPoint.y, 2)
+                    );
+                    
+                    // Return true if within tolerance
+                    return distance <= this.clickTolerance;
+                }
+                
+                showFeedback(isCorrect, x, y) {
+                    if (!this.$_feedbackTooltip) return;
+                    
+                    // Set tooltip text and class
+                    this.$_feedbackTooltip.textContent = isCorrect ? 'Correct!' : 'Wrong!';
+                    this.$_feedbackTooltip.className = 'feedback-tooltip ' + (isCorrect ? 'correct' : 'wrong');
+                    
+                    // Position tooltip near click position
+                    this.$_feedbackTooltip.style.left = \`\${x}px\`;
+                    this.$_feedbackTooltip.style.top = \`\${y - 40}px\`; // Position above cursor
+                    
+                    // Show tooltip
+                    this.$_feedbackTooltip.classList.add('visible');
+                    
+                    // Hide tooltip after delay
+                    setTimeout(() => {
+                        this.$_feedbackTooltip.classList.remove('visible');
+                    }, 900); // Slightly shorter than next slide delay
                 }
             }
 
