@@ -337,9 +337,13 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     this.lastCursorPosition = { x: 0, y: 0 };
                     this.nextClickIndex = 0;
 
-                    // Create a timeline based on clickpoints for smooth transitions
+                    // Find the minimum relative time to offset the timeline correctly
+                    this.timeOffset = this.findMinimumRelativeTime();
+                    
+                    // Create a timeline based on clickpoints for smooth transitions (using offset)
                     this.timelinePoints = this.clickPoints.map((point) => ({
-                        time: point.relativeTime / 1000, // convert to seconds
+                        // Adjust time to start from zero by subtracting the minimum time
+                        time: (point.relativeTime - this.timeOffset) / 1000, 
                         imageIndex: this.clickPoints.indexOf(point),
                     }));
 
@@ -380,7 +384,8 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     if (!this.$_cursor || this.cursorMovements.length === 0) return;
                     
                     // Convert to milliseconds for comparison with relativeTime
-                    const timeMs = currentTime * 1000;
+                    // Add the offset back for comparison with the original timestamps
+                    const timeMs = (currentTime * 1000) + this.timeOffset;
                     
                     // Find the movement data points that surround the current time
                     let prevMovement = this.cursorMovements[0];
@@ -514,7 +519,7 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                         // When clicking a slide, update the timeline to that time
                         const clickPoint = this.clickPoints[index];
                         if (clickPoint) {
-                            const time = clickPoint.relativeTime / 1000;
+                            const time = (clickPoint.relativeTime - this.timeOffset) / 1000;
 
                             // If playing, update playback time
                             if (this.isPlaying) {
@@ -633,7 +638,7 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                 // Reset click index based on the current time
                 resetClickIndexForTime(time) {
                     // Convert time to milliseconds
-                    const timeMs = time * 1000;
+                    const timeMs = (time * 1000) + this.timeOffset;
                     this.nextClickIndex = 0;
                     
                     for (let i = 0; i < this.clickPoints.length; i++) {
@@ -712,7 +717,8 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                 getCurrentTimeFromIndex(index) {
                     const clickPoint = this.clickPoints[index];
                     if (clickPoint) {
-                        return clickPoint.relativeTime / 1000;
+                        // Adjust time to start from zero
+                        return (clickPoint.relativeTime - this.timeOffset) / 1000;
                     }
                     return 0;
                 }
@@ -796,11 +802,11 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     // Update timeline to reflect the current slide
                     const clickPoint = this.clickPoints[index];
                     if (clickPoint) {
-                        this.updateProgressBarByTime(clickPoint.relativeTime / 1000);
+                        this.updateProgressBarByTime((clickPoint.relativeTime - this.timeOffset) / 1000);
                         
                         // Update cursor position
                         if (this.cursorMovements.length > 0) {
-                            this.updateCursorPosition(clickPoint.relativeTime / 1000);
+                            this.updateCursorPosition((clickPoint.relativeTime - this.timeOffset) / 1000);
                         }
                     }
                 }
@@ -842,7 +848,7 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     if (this.clickPoints && this.clickPoints.length > 0) {
                         const clickPoint = this.clickPoints[this.activeImageIndex];
                         if (clickPoint) {
-                            this.updateProgressBarByTime(clickPoint.relativeTime / 1000);
+                            this.updateProgressBarByTime((clickPoint.relativeTime - this.timeOffset) / 1000);
                         }
                     } else {
                         // Fall back to the original calculation
@@ -862,6 +868,21 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     return \`\${mins.toString().padStart(2, "0")}:\${secs
                         .toString()
                         .padStart(2, "0")}\`;
+                }
+                
+                // Find the minimum relativeTime from all click points
+                findMinimumRelativeTime() {
+                    if (!this.clickPoints || this.clickPoints.length === 0) {
+                        return 0;
+                    }
+                    
+                    let minTime = Number.MAX_VALUE;
+                    for (const point of this.clickPoints) {
+                        if (point.relativeTime < minTime) {
+                            minTime = point.relativeTime;
+                        }
+                    }
+                    return minTime;
                 }
             }
 

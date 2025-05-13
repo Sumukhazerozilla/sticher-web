@@ -335,11 +335,17 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     this.animationFrame = null;
                     this.playbackStartTime = 0;
                     this.currentPlaybackTime = 0;
+                    
+                    // Calculate total duration from the actual recording duration
                     this.totalDuration = (this.recordingData.endTime - this.recordingData.startTime) / 1000;
-
-                    // Create a timeline based on clickpoints for smooth transitions
+                    
+                    // Find the minimum relative time to offset the timeline correctly
+                    this.timeOffset = this.findMinimumRelativeTime();
+                    
+                    // Create a timeline based on clickpoints for smooth transitions (using offset)
                     this.timelinePoints = this.clickPoints.map((point) => ({
-                        time: point.relativeTime / 1000, // convert to seconds
+                        // Adjust time to start from zero by subtracting the minimum time
+                        time: (point.relativeTime - this.timeOffset) / 1000, 
                         imageIndex: this.clickPoints.indexOf(point),
                     }));
 
@@ -353,6 +359,21 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     this.clickTolerance = 30;
 
                     this.init();
+                }
+                
+                // Find the minimum relativeTime from all click points
+                findMinimumRelativeTime() {
+                    if (!this.clickPoints || this.clickPoints.length === 0) {
+                        return 0;
+                    }
+                    
+                    let minTime = Number.MAX_VALUE;
+                    for (const point of this.clickPoints) {
+                        if (point.relativeTime < minTime) {
+                            minTime = point.relativeTime;
+                        }
+                    }
+                    return minTime;
                 }
 
                 init() {
@@ -585,7 +606,8 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                 getCurrentTimeFromIndex(index) {
                     const clickPoint = this.clickPoints[index];
                     if (clickPoint) {
-                        return clickPoint.relativeTime / 1000;
+                        // Adjust time to start from zero
+                        return (clickPoint.relativeTime - this.timeOffset) / 1000;
                     }
                     return 0;
                 }
@@ -622,7 +644,7 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     const progressPercentage = (time / this.totalDuration) * 100;
                     this.$_timelineProgress.style.width = \`\${progressPercentage}%\`;
 
-                    // Update time display
+                    // Update time display, apply offset correction
                     const currentTime = this.formatTime(time);
                     const totalTime = this.formatTime(this.totalDuration);
                     document.querySelector(
