@@ -126,7 +126,7 @@ const SticherView: React.FC<SticherViewProps> = ({
       style={{ gridTemplateColumns: "300px 1fr" }}
     >
       <div className="h-full overflow-y-auto pb-5">
-        {fileMetaData.images.length ? (
+        {fileMetaData?.images?.length ? (
           <div className="flex flex-col gap-2">
             {fileMetaData.images.map((image, index) => (
               <div

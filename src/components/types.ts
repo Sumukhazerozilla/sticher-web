@@ -27,6 +27,20 @@ export interface IMetadata {
     totalPausedTime: number;
     videoFormats: string[];
   };
+
+  keyboardEvents: IKeyBoardEvent[];
+}
+
+export interface IKeyBoardEvent {
+  highPrecisionTime: number;
+  key: string;
+  relativeTime: number;
+  screenshot: string;
+  time: number;
+  type: string;
+  vKey: number;
+  x: number;
+  y: number;
 }
 
 export interface IResponse {

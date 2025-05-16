@@ -45,9 +45,9 @@ function App() {
   };
 
   const onFileUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append("zipFile", file);
     try {
+      const formData = new FormData();
+      formData.append("zipFile", file);
       const url = `${BASE_URL}/api/upload`;
       const response = await axios.post(url, formData, {
         headers: {
@@ -64,7 +64,6 @@ function App() {
       setData(result);
     } catch (error) {
       console.error("Error uploading file:", error);
-      alert("File upload failed. Please try again.");
     }
   };
 
@@ -83,7 +82,8 @@ function App() {
         </div>
       </div>
       <section>
-        {!data?.metadata?.points?.length ? (
+        {!data?.metadata?.points?.length &&
+        !data?.metadata?.keyboardEvents?.length ? (
           <div className="text-center text-gray-500 mt-4">
             No points found in the metadata.
           </div>

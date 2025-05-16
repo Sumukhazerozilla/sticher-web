@@ -63,51 +63,82 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
 
     // For each image in the file metadata
     for (let i = 0; i < fileMetaData.images.length; i++) {
-      const imageUrl = `${baseUrl}${fileMetaData.images[i]}`;
-      const tooltipText = tooltips[i]?.text || `Note ${i + 1}`;
-      const point = fileMetaData.metadata.points[i];
+      try {
+        const imageUrl = `${baseUrl}${fileMetaData.images[i]}`;
+        const tooltipText = tooltips[i]?.text || `Note ${i + 1}`;
 
-      // Create canvas with image and tooltip
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) continue;
+        // Find the corresponding point or use a default
+        const pointIndex = Math.min(i, fileMetaData.metadata.points.length - 1);
+        const point =
+          pointIndex >= 0 ? fileMetaData.metadata.points[pointIndex] : null;
 
-      // Load the image
-      const img = await loadImage(imageUrl);
-      canvas.width = img.width;
-      canvas.height = img.height;
+        // Create canvas with image and tooltip
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) continue;
 
-      // Draw the image
-      ctx.drawImage(img, 0, 0);
+        // Load the image
+        const img = await loadImage(imageUrl);
+        canvas.width = img.width;
+        canvas.height = img.height;
 
-      // Extract coordinates from the filename
-      const filename = fileMetaData.images[i];
-      const match = filename.match(/click_\d+_([0-9.]+)_([0-9.]+)\.png$/);
-      let x, y;
+        // Draw the image
+        ctx.drawImage(img, 0, 0);
 
-      if (match && match.length === 3) {
-        x = parseFloat(match[1]);
-        y = parseFloat(match[2]);
-        console.log(`Using filename coordinates for image ${i + 1}:`, {
-          x,
-          y,
-        });
-      } else {
-        // Fallback to point.x and point.y
-        x = point.x;
-        y = point.y;
-        console.log(`Using point coordinates for image ${i + 1}:`, { x, y });
+        // Extract coordinates from the filename or use defaults
+        const filename = fileMetaData.images[i];
+        const match = filename.match(/click_\d+_([0-9.]+)_([0-9.]+)\.png$/);
+        let x, y;
+
+        if (match && match.length === 3) {
+          // First priority: Use coordinates from filename
+          x = parseFloat(match[1]);
+          y = parseFloat(match[2]);
+          console.log(`Using filename coordinates for image ${i + 1}:`, {
+            x,
+            y,
+          });
+        } else if (point?.domBounds) {
+          // Second priority: Use domBounds if available
+          x = point.domBounds.x + point.domBounds.width / 2;
+          y = point.domBounds.y + point.domBounds.height / 2;
+          console.log(`Using domBounds coordinates for image ${i + 1}:`, {
+            x,
+            y,
+            bounds: point.domBounds,
+          });
+        } else if (
+          point &&
+          typeof point.x === "number" &&
+          typeof point.y === "number"
+        ) {
+          // Third priority: Use point.x and point.y if available
+          x = point.x;
+          y = point.y;
+          console.log(`Using point coordinates for image ${i + 1}:`, { x, y });
+        } else {
+          // Fallback to center of image if no coordinates are available
+          x = img.width / 2;
+          y = img.height / 2;
+          console.log(`Using default center coordinates for image ${i + 1}:`, {
+            x,
+            y,
+          });
+        }
+
+        // Draw the tooltip
+        drawTooltip(ctx, x, y, tooltipText);
+
+        // Convert canvas to blob and add to zip
+        const blob = await new Promise<Blob>((resolve) =>
+          canvas.toBlob((blob) => resolve(blob as Blob), "image/png")
+        );
+
+        taggedImageFolder.file(`image_${i + 1}.png`, blob);
+      } catch (error) {
+        console.error(`Failed to process image ${i + 1}:`, error);
+        // Continue with next image instead of stopping the entire process
       }
-
-      // Draw the tooltip
-      drawTooltip(ctx, x, y, tooltipText);
-
-      // Convert canvas to blob and add to zip
-      const blob = await new Promise<Blob>((resolve) =>
-        canvas.toBlob((blob) => resolve(blob as Blob), "image/png")
-      );
-
-      taggedImageFolder.file(`image_${i + 1}.png`, blob);
     }
   }
 
@@ -117,8 +148,14 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => resolve(img);
-      img.onerror = (e) => reject(e);
-      img.src = src;
+      img.onerror = (e) => {
+        console.error("Failed to load image:", src, e);
+        reject(e);
+      };
+
+      // Encode the URL to handle spaces and special characters in filenames
+      const encodedSrc = encodeURI(src);
+      img.src = encodedSrc;
     });
   };
 
