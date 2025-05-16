@@ -49,4 +49,5 @@ export interface IResponse {
   images: string[];
   filename: string;
   processedAt: string;
+  audio?: string;
 }

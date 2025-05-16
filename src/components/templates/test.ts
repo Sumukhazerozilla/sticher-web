@@ -10,6 +10,8 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
       const filename = imagePath.split("/").pop() || "image.png";
       return `./resources/${filename}`;
     }),
+    // Point to the local audio file in the zip
+    audio: response.audio ? "./audio.mp3" : null,
   };
 
   const template = `
@@ -276,6 +278,11 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     </div>
                 </div>
             </div>
+            <!-- Hidden audio element for the recording -->
+            <audio id="recording-audio" preload="auto" style="display:none;">
+                <source src="./audio.mp3" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
         </main>
 
         <script>
@@ -290,6 +297,11 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
 
             // Get recording metadata for accurate timeline
             const recordingData = apiResponse.metadata.lastRecording;
+            
+            // Debug audio path from response
+            console.log("Audio path from response:", "${
+              response.audio || "No audio available"
+            }");
             
             // Combine click points and keyboard events but give priority to clicks for interactions
             const allEvents = [
@@ -315,6 +327,35 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     this.BASE_URL = baseUrl;
                     this.apiData = apiData;
                     this.recordingData = apiData.metadata.lastRecording;
+                    
+                    // Audio setup with better error handling
+                    this.audioPath = "${response.audio || ""}";
+                    this.$_audio = document.getElementById('recording-audio');
+                    this.hasAudio = !!this.$_audio;
+                    console.log("Audio available:", this.hasAudio, "Path:", this.audioPath);
+                    
+                    if (this.hasAudio && this.$_audio) {
+                        try {
+                            this.$_audio = new Audio(this.audioPath);
+                            this.$_audio.preload = "auto";
+                            
+                            // Add event listeners for debugging
+                            this.$_audio.addEventListener('canplay', () => {
+                                console.log("Audio can play now");
+                            });
+                            
+                            this.$_audio.addEventListener('error', (e) => {
+                                console.error("Audio error:", e);
+                                console.error("Audio error code:", this.$_audio.error ? this.$_audio.error.code : "unknown");
+                                this.hasAudio = false; // Disable audio functionality if error
+                            });
+                            
+                            console.log("Audio element created");
+                        } catch (err) {
+                            console.error("Error creating audio element:", err);
+                            this.hasAudio = false;
+                        }
+                    }
                     
                     // Use combined and sorted events list
                     this.allEvents = allEvents;
@@ -458,6 +499,17 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                             if (this.isPlaying) {
                                 this.currentPlaybackTime = time;
                                 this.playbackStartTime = Date.now();
+                                
+                                // Update audio position if available
+                                if (this.hasAudio && this.$_audio) {
+                                    this.$_audio.currentTime = time;
+                                }
+                            } else {
+                                // Even if not playing, update the audio position
+                                if (this.hasAudio && this.$_audio) {
+                                    this.$_audio.currentTime = time;
+                                    this.currentPlaybackTime = time;
+                                }
                             }
 
                             // Update progress bar to match the time of this slide
@@ -480,6 +532,16 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                             // Reset playback start time with new speed
                             this.currentPlaybackTime = currentTime;
                             this.playbackStartTime = Date.now();
+                            
+                            // Update audio playback rate if available
+                            if (this.hasAudio && this.$_audio) {
+                                this.$_audio.playbackRate = this.playbackSpeed;
+                            }
+                        } else {
+                            // Even if not playing, update the playback rate
+                            if (this.hasAudio && this.$_audio) {
+                                this.$_audio.playbackRate = this.playbackSpeed;
+                            }
                         }
                     });
                 }
@@ -526,6 +588,16 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     this.$_volumeSlider.addEventListener("input", (e) => {
                         this.volume = e.target.value;
                         this.updateVolumeUI();
+                        
+                        // Update audio volume if available
+                        if (this.hasAudio && this.$_audio) {
+                            try {
+                                this.$_audio.volume = this.muted ? 0 : this.volume / 100;
+                                console.log("Volume set to:", this.$_audio.volume);
+                            } catch (err) {
+                                console.error("Error setting audio volume:", err);
+                            }
+                        }
                     });
 
                     // Timeline click - use time-based positioning
@@ -539,6 +611,17 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                         if (this.isPlaying) {
                             this.currentPlaybackTime = targetTime;
                             this.playbackStartTime = Date.now();
+                            
+                            // Update audio position if available
+                            if (this.hasAudio && this.$_audio) {
+                                this.$_audio.currentTime = targetTime;
+                            }
+                        } else {
+                            // Even if not playing, update the audio position
+                            if (this.hasAudio && this.$_audio) {
+                                this.$_audio.currentTime = targetTime;
+                                this.currentPlaybackTime = targetTime;
+                            }
                         }
 
                         this.goToSlideByTime(targetTime);
@@ -581,6 +664,38 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                         this.currentPlaybackTime = 0;
                         this.goToSlideByTime(0);
                     }
+                    
+                    // Play audio if available
+                    if (this.hasAudio && this.$_audio) {
+                        console.log("Attempting to play audio from position:", this.currentPlaybackTime);
+                        
+                        try {
+                            // Set the current time for the audio
+                            this.$_audio.currentTime = this.currentPlaybackTime;
+                            
+                            // Set playback rate
+                            this.$_audio.playbackRate = this.playbackSpeed;
+                            
+                            // Set volume based on UI state
+                            this.$_audio.volume = this.muted ? 0 : this.volume / 100;
+                            
+                            // Play audio with user interaction context (should work since this is called from a click handler)
+                            const playPromise = this.$_audio.play();
+                            if (playPromise !== undefined) {
+                                playPromise.then(() => {
+                                    console.log("Audio started playing successfully");
+                                }).catch(err => {
+                                    console.error("Audio playback failed:", err);
+                                    // Try to handle autoplay restrictions
+                                    if (err.name === 'NotAllowedError') {
+                                        console.warn("Audio autoplay blocked by browser. User interaction required.");
+                                    }
+                                });
+                            }
+                        } catch (err) {
+                            console.error("Error playing audio:", err);
+                        }
+                    }
 
                     // Use requestAnimationFrame for smooth playback
                     this.animatePlayback();
@@ -595,6 +710,18 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                         cancelAnimationFrame(this.animationFrame);
                         this.animationFrame = null;
                     }
+                    
+                    // Pause audio if available
+                    if (this.hasAudio && this.$_audio) {
+                        try {
+                            console.log("Pausing audio at:", this.$_audio.currentTime);
+                            this.$_audio.pause();
+                            // Save current playback time
+                            this.currentPlaybackTime = this.$_audio.currentTime;
+                        } catch (err) {
+                            console.error("Error pausing audio:", err);
+                        }
+                    }
                 }
 
                 animatePlayback() {
@@ -608,6 +735,11 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                         this.playbackStartTime = Date.now();
                         this.currentPlaybackTime = 0;
                         this.goToSlideByTime(0);
+                        
+                        // Reset audio if available
+                        if (this.hasAudio && this.$_audio) {
+                            this.$_audio.currentTime = 0;
+                        }
                     } else {
                         // Update display based on current time
                         this.goToSlideByTime(currentTime);
@@ -728,6 +860,16 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                 toggleMute() {
                     this.muted = !this.muted;
                     this.updateVolumeUI();
+                    
+                    // Update audio mute state
+                    if (this.hasAudio && this.$_audio) {
+                        try {
+                            this.$_audio.volume = this.muted ? 0 : this.volume / 100;
+                            console.log("Audio " + (this.muted ? "muted" : "unmuted"));
+                        } catch (err) {
+                            console.error("Error toggling audio mute:", err);
+                        }
+                    }
                 }
 
                 updateVolumeUI() {
@@ -737,6 +879,11 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     } else {
                         this.$_volumeButton.textContent = "🔊";
                         this.$_volumeSlider.value = this.volume;
+                    }
+                    
+                    // Update audio volume if available
+                    if (this.hasAudio && this.$_audio) {
+                        this.$_audio.volume = this.muted ? 0 : this.volume / 100;
                     }
                 }
 

@@ -27,6 +27,36 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
       // Then, create the annotated images
       await addAnnotatedImageToZip(zip);
 
+      // Store the audio file if it exists
+      if (fileMetaData.audio) {
+        try {
+          console.log(
+            "Downloading audio from:",
+            `${BASE_URL}${fileMetaData.audio}`
+          );
+          const audioUrl = `${BASE_URL}${fileMetaData.audio}`;
+          const audioResponse = await axios.get(audioUrl, {
+            responseType: "arraybuffer",
+          });
+
+          // Determine the file extension from the original URL (.webm, .mp3, etc.)
+          const originalExt =
+            fileMetaData.audio.split(".").pop()?.toLowerCase() || "mp3";
+
+          // Save with the original extension to preserve format
+          zip.file(`audio.${originalExt}`, audioResponse.data);
+
+          // If it's webm, also save as mp3 for broader compatibility
+          if (originalExt === "webm") {
+            zip.file("audio.mp3", audioResponse.data);
+          }
+
+          console.log("Audio file added to zip successfully");
+        } catch (error) {
+          console.error("Error downloading audio:", error);
+        }
+      }
+
       // Finally, create the HTML files after all resources are available
       await demoHtml(fileMetaData, zip);
       await testHtml(fileMetaData, zip);
