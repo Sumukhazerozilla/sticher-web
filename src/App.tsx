@@ -8,6 +8,7 @@ import axios from "axios";
 
 function App() {
   const [data, setData] = useState<null | IResponse>(null);
+  const [loading, setLoading] = useState(true);
 
   const [tooltips, setTooltips] = useState<{ id: number; text: string }[]>(
     data?.metadata?.points?.map((_, index) => ({
@@ -27,8 +28,13 @@ function App() {
           const response = await axios.get(`${BASE_URL}/api/files/${fileId}`);
           const result = response.data as IResponse;
           setData(result);
+          setLoading(false);
         } catch (error) {
+          setLoading(false);
           console.error("Error fetching file data:", error);
+          alert(
+            "Error fetching file data. Please check the file ID and try again."
+          );
         }
       };
       fetchFileData();
@@ -46,12 +52,22 @@ function App() {
 
   const onFileUpload = async (file: File) => {
     try {
+      console.log("File to upload:", file);
       const formData = new FormData();
       formData.append("zipFile", file);
       const url = `${BASE_URL}/api/upload`;
+      console.log("Uploading to URL:", url);
       const response = await axios.post(url, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
+        },
+        timeout: 120000, // 2 minute timeout for large files
+        onUploadProgress: (progressEvent) => {
+          // Optional: track upload progress
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total!
+          );
+          console.log(`Upload progress: ${percentCompleted}%`);
         },
       });
       const result = response.data as IResponse;
@@ -69,31 +85,39 @@ function App() {
 
   return (
     <main className="pt-2 px-5">
-      <div className="flex items-center justify-end gap-2">
-        <UploadButton onFileUpload={onFileUpload} />
-        <div>
-          {data && (
-            <ImageExporter
-              fileMetaData={data}
-              tooltips={tooltips}
-              baseUrl={BASE_URL}
-            />
-          )}
+      {loading ? (
+        <div className="flex items-center justify-center h-screen">
+          <div className="loader"></div>
         </div>
-      </div>
-      <section>
-        {!data?.metadata?.points?.length &&
-        !data?.metadata?.keyboardEvents?.length ? (
-          <div className="text-center text-gray-500 mt-4">
-            No points found in the metadata.
+      ) : (
+        <>
+          <div className="flex items-center justify-end gap-2">
+            <UploadButton onFileUpload={onFileUpload} />
+            <div>
+              {data && (
+                <ImageExporter
+                  fileMetaData={data}
+                  tooltips={tooltips}
+                  baseUrl={BASE_URL}
+                />
+              )}
+            </div>
           </div>
-        ) : (
-          <SticherView
-            fileMetaData={data}
-            onUpdateTooltips={handleTooltipsUpdate}
-          />
-        )}
-      </section>
+          <section>
+            {!data?.metadata?.points?.length &&
+            !data?.metadata?.keyboardEvents?.length ? (
+              <div className="text-center text-gray-500 mt-4">
+                No points found in the metadata.
+              </div>
+            ) : (
+              <SticherView
+                fileMetaData={data}
+                onUpdateTooltips={handleTooltipsUpdate}
+              />
+            )}
+          </section>
+        </>
+      )}
     </main>
   );
 }
