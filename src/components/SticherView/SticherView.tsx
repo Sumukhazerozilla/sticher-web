@@ -2,15 +2,23 @@ import { useState, useRef, useEffect } from "react";
 import { BASE_URL } from "../constants";
 import { IResponse } from "../types";
 import Tooltip from "./Tooltip";
+import { AiFillDelete } from "react-icons/ai";
+import axios from "axios";
 
 interface SticherViewProps {
   fileMetaData: IResponse;
+  loading: boolean;
   onUpdateTooltips?: (tooltips: { id: number; text: string }[]) => void;
+  fetchFileData: (fileId: string) => Promise<void>;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const SticherView: React.FC<SticherViewProps> = ({
   fileMetaData,
   onUpdateTooltips,
+  fetchFileData,
+  loading,
+  setLoading,
 }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [tooltips, setTooltips] = useState<{ id: number; text: string }[]>(
@@ -120,6 +128,24 @@ const SticherView: React.FC<SticherViewProps> = ({
     return { x, y };
   };
 
+  const handleDeleteImage =
+    (filePath: string) =>
+    async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+      try {
+        e.stopPropagation();
+        setLoading(true);
+        await axios.delete(`${BASE_URL}/api/files/${fileMetaData.fileId}`, {
+          data: {
+            filePath: filePath,
+          },
+        });
+        fetchFileData(fileMetaData.fileId);
+      } catch (error) {
+        console.log("Error stopping propagation:", error);
+        alert("Error deleting image. Please try again later.");
+      }
+    };
+
   return (
     <div
       className="grid gap-10 h-[90vh] overflow-hidden mt-2"
@@ -143,6 +169,17 @@ const SticherView: React.FC<SticherViewProps> = ({
                 />
                 <div className="absolute top-2 left-2 bg-indigo-500 text-white text-xs px-2 py-1 rounded-full">
                   {index + 1}
+                </div>
+
+                <div className="absolute top-0 right-0">
+                  <button
+                    disabled={loading}
+                    onClick={handleDeleteImage(image)}
+                    className="bg-red-500  rounded-full border-[1px] border-white h-7 w-7 flex items-center justify-center m-2 cursor-pointer disabled:opacity-50"
+                    title="Delete image"
+                  >
+                    <AiFillDelete color="white" size={14} />
+                  </button>
                 </div>
               </div>
             ))}

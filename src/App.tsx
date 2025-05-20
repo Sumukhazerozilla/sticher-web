@@ -22,27 +22,29 @@ function App() {
     const fileId = urlParams.get("fileId");
     console.log("File ID from URL:", fileId);
     if (fileId?.length && !data?.fileId?.length) {
-      // Fetch the file data using the fileId
-      const fetchFileData = async () => {
-        try {
-          const response = await axios.get(`${BASE_URL}/api/files/${fileId}`);
-          const result = response.data as IResponse;
-          setData(result);
-          setLoading(false);
-        } catch (error) {
-          setLoading(false);
-          console.error("Error fetching file data:", error);
-          alert(
-            "Error fetching file data. Please check the file ID and try again."
-          );
-        }
-      };
-      fetchFileData();
+      fetchFileData(fileId);
     }
     // if (!data?.fileId?.length) {
     //   // Get the fileId from url params
     // }
   }, [data]);
+
+  // Fetch the file data using the fileId
+  const fetchFileData = async (fileId: string) => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${BASE_URL}/api/files/${fileId}`);
+      const result = response.data as IResponse;
+      setData(result);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      console.error("Error fetching file data:", error);
+      alert(
+        "Error fetching file data. Please check the file ID and try again."
+      );
+    }
+  };
 
   const handleTooltipsUpdate = (
     updatedTooltips: { id: number; text: string }[]
@@ -113,6 +115,9 @@ function App() {
               <SticherView
                 fileMetaData={data}
                 onUpdateTooltips={handleTooltipsUpdate}
+                fetchFileData={fetchFileData}
+                loading={loading}
+                setLoading={setLoading}
               />
             )}
           </section>

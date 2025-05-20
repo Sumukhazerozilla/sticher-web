@@ -67,13 +67,13 @@ const Tooltip: React.FC<TooltipProps> = ({ x, y, text, onTextUpdate }) => {
       style={{
         left: `${x}px`,
         top: `${y}px`,
-        transform: `translate(${determineHorizontalPosition(x)}, -110%)`, // Adjust horizontal position based on proximity to edges
+        transform: `translate(${determineHorizontalPosition(x)}, -110%)`,
         zIndex: isEditing ? 1000 : 50, // Higher z-index when editing
       }}
     >
       <div ref={containerRef} className="flex flex-col items-center">
         <div
-          className={`bg-indigo-600 text-white p-3 rounded-lg shadow-lg max-w-xs mb-2
+          className={`bg-indigo-600 text-white p-3 rounded-lg shadow-lg max-w-xs 
             ${isEditing ? "border-2 border-white" : ""}`}
           onDoubleClick={handleDoubleClick}
         >
