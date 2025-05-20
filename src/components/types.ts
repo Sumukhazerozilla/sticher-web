@@ -51,3 +51,10 @@ export interface IResponse {
   processedAt: string;
   audio?: string;
 }
+
+export interface ISlideData {
+  id: string;
+  timeStamp: number;
+  image: string;
+  text: string;
+}

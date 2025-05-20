@@ -1,32 +1,50 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import UploadButton from "./components/UploadButton";
 import SticherView from "./components/SticherView";
-import ImageExporter from "./components/ImageExporter";
+// import ImageExporter from "./components/ImageExporter";
 import { BASE_URL } from "./components/constants";
-import { IResponse } from "./components/types";
+import { IResponse, ISlideData } from "./components/types";
 import axios from "axios";
+import useSticherStore from "./store/sticherStore";
+import { nanoid } from "nanoid";
 
 function App() {
-  const [data, setData] = useState<null | IResponse>(null);
-  const [loading, setLoading] = useState(true);
+  const setSlideData = useSticherStore((state) => state.setSlideData);
+  const loading = useSticherStore((state) => state.loading);
+  const setLoading = useSticherStore((state) => state.setLoading);
+  const data = useSticherStore((state) => state.response);
+  const setData = useSticherStore((state) => state.setResponse);
+  // const [data, setData] = useState<null | IResponse>(null);
+  // const [loading, setLoading] = useState(true);
 
-  const [tooltips, setTooltips] = useState<{ id: number; text: string }[]>(
-    data?.metadata?.points?.map((_, index) => ({
-      id: index,
-      text: `Note ${index + 1}`,
-    })) || []
-  );
+  // const [tooltips, setTooltips] = useState<{ id: number; text: string }[]>(
+  //   data?.metadata?.points?.map((_, index) => ({
+  //     id: index,
+  //     text: `Note ${index + 1}`,
+  //   })) || []
+  // );
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const fileId = urlParams.get("fileId");
-    console.log("File ID from URL:", fileId);
     if (fileId?.length && !data?.fileId?.length) {
       fetchFileData(fileId);
     }
-    // if (!data?.fileId?.length) {
-    //   // Get the fileId from url params
-    // }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  useEffect(() => {
+    if (data) {
+      const slideData: ISlideData[] = data?.images?.map((slide, index) => ({
+        id: nanoid(),
+        timeStamp: data?.metadata?.points[index]?.time,
+        image: slide,
+        text: "You clicked here",
+      }));
+
+      setSlideData(slideData);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
   // Fetch the file data using the fileId
@@ -46,11 +64,11 @@ function App() {
     }
   };
 
-  const handleTooltipsUpdate = (
-    updatedTooltips: { id: number; text: string }[]
-  ) => {
-    setTooltips(updatedTooltips);
-  };
+  // const handleTooltipsUpdate = (
+  //   updatedTooltips: { id: number; text: string }[]
+  // ) => {
+  //   setTooltips(updatedTooltips);
+  // };
 
   const onFileUpload = async (file: File) => {
     try {
@@ -96,13 +114,13 @@ function App() {
           <div className="flex items-center justify-end gap-2">
             <UploadButton onFileUpload={onFileUpload} />
             <div>
-              {data && (
+              {/* {data && (
                 <ImageExporter
                   fileMetaData={data}
                   tooltips={tooltips}
                   baseUrl={BASE_URL}
                 />
-              )}
+              )} */}
             </div>
           </div>
           <section>
@@ -112,13 +130,7 @@ function App() {
                 No points found in the metadata.
               </div>
             ) : (
-              <SticherView
-                fileMetaData={data}
-                onUpdateTooltips={handleTooltipsUpdate}
-                fetchFileData={fetchFileData}
-                loading={loading}
-                setLoading={setLoading}
-              />
+              <SticherView />
             )}
           </section>
         </>
