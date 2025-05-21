@@ -14,15 +14,6 @@ function App() {
   const setLoading = useSticherStore((state) => state.setLoading);
   const data = useSticherStore((state) => state.response);
   const setData = useSticherStore((state) => state.setResponse);
-  // const [data, setData] = useState<null | IResponse>(null);
-  // const [loading, setLoading] = useState(true);
-
-  // const [tooltips, setTooltips] = useState<{ id: number; text: string }[]>(
-  //   data?.metadata?.points?.map((_, index) => ({
-  //     id: index,
-  //     text: `Note ${index + 1}`,
-  //   })) || []
-  // );
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -63,12 +54,6 @@ function App() {
       );
     }
   };
-
-  // const handleTooltipsUpdate = (
-  //   updatedTooltips: { id: number; text: string }[]
-  // ) => {
-  //   setTooltips(updatedTooltips);
-  // };
 
   const onFileUpload = async (file: File) => {
     try {
