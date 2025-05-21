@@ -1,39 +1,7 @@
 import { AiFillDelete } from "react-icons/ai";
 import { BASE_URL } from "../constants";
-// import { IResponse } from "../types";
 import useSticherStore from "../../store/sticherStore";
-import { useState } from "react";
-
-// interface LeftSectionProps {
-//   fileMetaData: IResponse;
-//   loading: boolean;
-//   setActiveImageIndex: React.Dispatch<React.SetStateAction<number>>;
-//   activeImageIndex: number;
-//   handleDeleteImage: (
-//     filePath: string
-//   ) => (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => Promise<void>;
-// }
-
-const TextArea = ({
-  text,
-  editSlideText,
-  id,
-}: {
-  text: string;
-  id: string;
-  editSlideText: (id: string, text: string) => void;
-}) => {
-  const [textValue, setTextValue] = useState(text);
-
-  return (
-    <textarea
-      className="h-[58px] outline-1 outline-transparent border-none shadow-none focus:outline-gray-400 mt-1 text-sm p-1"
-      value={textValue}
-      onChange={(e) => setTextValue(e.target.value)}
-      onBlur={() => editSlideText(id, textValue)}
-    ></textarea>
-  );
-};
+import TextArea from "./TextArea";
 
 const LeftSection: React.FC = () => {
   const slideData = useSticherStore((state) => state.slideData);

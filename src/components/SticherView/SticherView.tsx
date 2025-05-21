@@ -2,20 +2,8 @@ import LeftSection from "./LeftSection";
 import { useRef } from "react";
 import useSticherStore from "../../store/sticherStore";
 import { BASE_URL } from "../constants";
+import Tooltip from "./Tooltip";
 
-// interface SticherViewProps {
-// fileMetaData: IResponse;
-// loading: boolean;
-// onUpdateTooltips?: (tooltips: { id: number; text: string }[]) => void;
-// fetchFileData: (fileId: string) => Promise<void>;
-// setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-// }
-
-// fileMetaData,
-// onUpdateTooltips,
-// fetchFileData,
-// loading,
-// setLoading,
 const SticherView: React.FC = () => {
   // const [activeImageIndex, setActiveImageIndex] = useState(0);
   // const [tooltips, setTooltips] = useState<{ id: number; text: string }[]>(
@@ -32,6 +20,7 @@ const SticherView: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeImageIndex = useSticherStore((state) => state.activeImageIndex);
   const slideData = useSticherStore((state) => state.slideData);
+  const onEditSlideText = useSticherStore((state) => state.editSlideText);
 
   const LARGE_IMAGE_URL = `${BASE_URL}${slideData[activeImageIndex]?.image}`;
   // const currentPoint = fileMetaData.metadata.points[activeImageIndex];
@@ -72,60 +61,56 @@ const SticherView: React.FC = () => {
   // };
 
   // Extract coordinates from filename
-  // const extractCoordsFromFilename = (
-  //   filename: string
-  // ): { x: number; y: number } | null => {
-  //   const match = filename.match(/click_\d+_([0-9.]+)_([0-9.]+)\.png$/);
-  //   if (match && match.length === 3) {
-  //     return {
-  //       x: parseFloat(match[1]),
-  //       y: parseFloat(match[2]),
-  //     };
-  //   }
-  //   return null;
-  // };
+  const extractCoordsFromFilename = (
+    filename: string
+  ): { x: number; y: number } | null => {
+    const match = filename.match(/click_\d+_([0-9.]+)_([0-9.]+)\.png$/);
+    if (match && match.length === 3) {
+      return {
+        x: parseFloat(match[1]),
+        y: parseFloat(match[2]),
+      };
+    }
+    return null;
+  };
 
   // Get tooltip position
-  // const getTooltipPosition = () => {
-  //   if (!imageRef.current || !currentPoint || !imageSize) return null;
+  const getTooltipPosition = () => {
+    if (!imageRef.current) return null;
 
-  //   // Get the current image display dimensions
-  //   const imgDisplayRect = imageRef.current.getBoundingClientRect();
+    // Get the current image display dimensions
+    const imgDisplayRect = imageRef.current.getBoundingClientRect();
 
-  //   // Calculate ratio between natural image size and display size
-  //   const displayRatioWidth = imgDisplayRect.width / imageSize.width;
-  //   const displayRatioHeight = imgDisplayRect.height / imageSize.height;
+    // Get natural image dimensions directly from the image element
+    const naturalWidth = imageRef.current.naturalWidth;
+    const naturalHeight = imageRef.current.naturalHeight;
 
-  //   // Try to get coordinates from the filename first (most accurate)
-  //   const filename = fileMetaData.images[activeImageIndex];
-  //   const filenameCoords = extractCoordsFromFilename(filename);
+    // Calculate ratio between natural image size and display size
+    const displayRatioWidth = imgDisplayRect.width / naturalWidth;
+    const displayRatioHeight = imgDisplayRect.height / naturalHeight;
 
-  //   if (filenameCoords) {
-  //     // Apply display ratio to adjust coordinates based on current image display size
-  //     const adjustedX = filenameCoords.x * displayRatioWidth;
-  //     const adjustedY = filenameCoords.y * displayRatioHeight;
+    // Try to get coordinates from the filename first (most accurate)
+    const filename = slideData[activeImageIndex]?.image || "";
+    const filenameCoords = extractCoordsFromFilename(filename);
 
-  //     console.log("Using coordinates from filename:", {
-  //       original: filenameCoords,
-  //       adjusted: { x: adjustedX, y: adjustedY },
-  //       displayRatio: { width: displayRatioWidth, height: displayRatioHeight },
-  //     });
+    if (filenameCoords) {
+      // Apply display ratio to adjust coordinates based on current image display size
+      const adjustedX = filenameCoords.x * displayRatioWidth;
+      const adjustedY = filenameCoords.y * displayRatioHeight;
 
-  //     return { x: adjustedX, y: adjustedY };
-  //   }
+      console.log("Using coordinates from filename:", {
+        original: filenameCoords,
+        adjusted: { x: adjustedX, y: adjustedY },
+        displayRatio: { width: displayRatioWidth, height: displayRatioHeight },
+      });
 
-  //   // Fallback to using the point data directly
-  //   const x = currentPoint.x * displayRatioWidth;
-  //   const y = currentPoint.y * displayRatioHeight;
+      return { x: adjustedX, y: adjustedY };
+    }
 
-  //   console.log("Using direct point coordinates:", {
-  //     original: { x: currentPoint.x, y: currentPoint.y },
-  //     adjusted: { x, y },
-  //     displayRatio: { width: displayRatioWidth, height: displayRatioHeight },
-  //   });
-
-  //   return { x, y };
-  // };
+    // No fallback since currentPoint is no longer available
+    console.log("Could not determine tooltip position");
+    return null;
+  };
 
   return (
     <div
@@ -144,10 +129,8 @@ const SticherView: React.FC = () => {
             alt="Selected screenshot"
             className="max-w-full"
           />
-          {/* 
+
           {imageRef.current &&
-            currentPoint &&
-            imageSize &&
             (() => {
               const position = getTooltipPosition();
               if (!position) return null;
@@ -156,16 +139,15 @@ const SticherView: React.FC = () => {
                 <Tooltip
                   x={position.x}
                   y={position.y}
-                  text={
-                    tooltips[activeImageIndex]?.text ||
-                    `Note ${activeImageIndex + 1}`
-                  }
-                  onTextUpdate={(text) =>
-                    handleTooltipUpdate(activeImageIndex, text)
-                  }
+                  text={`${slideData[activeImageIndex]?.text}`}
+                  onTextUpdate={(text) => {
+                    const id = slideData[activeImageIndex]?.id;
+                    console.log("Text updated:", text, id);
+                    onEditSlideText(id, text);
+                  }}
                 />
               );
-            })()} */}
+            })()}
         </div>
       </div>
     </div>
