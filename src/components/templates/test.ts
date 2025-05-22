@@ -1,17 +1,24 @@
 import JSZip from "jszip";
-import { IResponse } from "../types";
+import { IResponse, ISlideData } from "../types";
 
-export const testHtml = async (response: IResponse, zip: JSZip) => {
-  // Create a modified response with updated image paths pointing to resource images (without tooltips)
-  const modifiedResponse = {
-    ...response,
-    images: response.images.map((imagePath) => {
-      // Use the original images from the resources folder
-      const filename = imagePath.split("/").pop() || "image.png";
-      return `./resources/${filename}`;
-    }),
+export const testHtml = async (
+  slideData: ISlideData[],
+  response: IResponse | null,
+  zip: JSZip
+) => {
+  console.log("Test HTML function called", slideData);
+
+  // Create a modified structure combining slideData with additional info from response
+  const templateData = {
+    slideData: slideData.map((slide, index) => ({
+      ...slide,
+      // Use resources images for display
+      displayImage: `./resources/${slide.image.split("/").pop() || "image.png"}`,
+    })),
+    // Include necessary metadata from response
+    metadata: response?.metadata,
     // Point to the local audio file in the zip
-    audio: response.audio ? "./audio.mp3" : null,
+    audio: response?.audio ? "./audio.mp3" : null,
   };
 
   const template = `
@@ -20,7 +27,7 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Screen Recording Viewer</title>
+        <title>Screen Recording Viewer (Interactive)</title>
         <style>
             * {
                 box-sizing: border-box;
@@ -44,14 +51,50 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                 height: auto;
                 object-fit: cover;
             }
-            aside img {
-                cursor: pointer;
-                border-radius: 5px;
-                transition: transform 0.2s ease-in-out;
+            /* Left Section styles updated to match current component */
+            .aside_container {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                height: 85vh;
+                overflow-y: auto;
+                padding-bottom: 2rem;
             }
-            aside h2 {
-                font-size: 1.2rem;
-                padding: 10px;
+            .aside_container_section {
+                display: grid;
+                grid-template-columns: 100px 1fr;
+                align-items: center;
+                gap: 10px;
+                background-color: #ffffff;
+                cursor: pointer;
+                border-radius: 3px;
+                margin-bottom: 4px;
+                border: 1px solid #e5e7eb;
+                transition: all 0.2s ease;
+            }
+            .aside_container_section.active {
+                background-color: #e5e7eb;
+            }
+            .aside_container_section figure img {
+                width: 96px;
+                height: 96px;
+                object-fit: cover;
+            }
+            .aside_container_section section {
+                padding: 8px;
+                position: relative;
+            }
+            .aside_container_section h3 {
+                font-size: 14px;
+                margin-top: 4px;
+            }
+            .aside_container_section h3 span.index {
+                font-weight: bold;
+            }
+            .aside_container_section .note-text {
+                font-size: 14px;
+                margin-top: 4px;
+                padding: 4px;
             }
             figure img {
                 object-fit: cover;
@@ -63,40 +106,6 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                 grid-template-columns: 250px 1fr;
                 gap: 10px;
                 height: calc(85vh - 60px);
-            }
-            .aside_container {
-                display: flex;
-                flex-direction: column;
-                gap: 5px;
-                height: 85vh;
-                overflow-y: auto;
-                padding-bottom: 2rem;
-            }
-            .aside_container_section {
-                display: grid;
-                grid-template-columns: 120px 1fr;
-                align-items: center;
-                gap: 10px;
-                background-color: rgb(245, 245, 245);
-                cursor: pointer;
-                border-radius: 5px;
-                margin-bottom: 8px;
-                padding: 5px;
-                border-left: 3px solid transparent;
-                transition: all 0.2s ease;
-            }
-            .aside_container_section img {
-                border-radius: 3px;
-                aspect-ratio: 3/2;
-            }
-            .aside_container_section p {
-                font-size: 0.8rem;
-            }
-            .aside_container_section.active {
-                background-color: rgb(138, 227, 241);
-                color: #333;
-                border-left: 3px solid #0066cc;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             }
             /* Figure container needs position relative */
             figure {
@@ -289,86 +298,64 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
             // Use relative paths instead of server URL
             const BASE_URL = "";
 
-            // API Response data with paths pointing to resource images (without tooltips)
-            const apiResponse = ${JSON.stringify(modifiedResponse)};
-
-            // Use resource images from API response
-            const left_images = apiResponse.images;
-
+            // Template data with slideData and necessary response elements
+            const templateData = ${JSON.stringify(templateData)};
+            
+            // Access slide data directly
+            const slideData = templateData.slideData;
+            
+            // Use resource images for display
+            const displayImages = slideData.map(slide => slide.displayImage);
+            
             // Get recording metadata for accurate timeline
-            const recordingData = apiResponse.metadata.lastRecording;
+            const recordingData = templateData.metadata?.lastRecording;
             
             // Debug audio path from response
-            console.log("Audio path from response:", "${
-              response.audio || "No audio available"
-            }");
+            console.log("Audio path in HTML:", templateData.audio);
             
             // Combine click points and keyboard events but give priority to clicks for interactions
-            const allEvents = [
-                ...apiResponse.metadata.points.map(point => ({
+            const allEvents = recordingData ? [
+                ...templateData.metadata.points.map(point => ({
                     ...point,
                     type: 'click',
                     relativeTime: point.time - recordingData.startTime
                 })),
-                ...apiResponse.metadata.keyboardEvents.map(event => ({
+                ...templateData.metadata.keyboardEvents.map(event => ({
                     ...event,
                     relativeTime: event.time - recordingData.startTime
                 }))
-            ];
+            ] : [];
             
             // Sort events by time
             allEvents.sort((a, b) => a.relativeTime - b.relativeTime);
             
             // Use only click points for interactive testing
-            const clickPoints = apiResponse.metadata.points;
+            const clickPoints = templateData.metadata?.points || [];
 
             class TestHtml {
-                constructor(baseUrl, images, asideSelector, figureSelector, apiData) {
+                constructor(baseUrl, slideData, asideSelector, figureSelector, metadata) {
                     this.BASE_URL = baseUrl;
-                    this.apiData = apiData;
-                    this.recordingData = apiData.metadata.lastRecording;
+                    this.slideData = slideData;
+                    this.recordingData = metadata?.lastRecording || { startTime: 0, endTime: 0, screenSize: { width: 1920, height: 1080 } };
                     
                     // Audio setup with better error handling
-                    this.audioPath = "${response.audio || ""}";
+                    this.audioPath = templateData.audio || "";
                     this.$_audio = document.getElementById('recording-audio');
-                    this.hasAudio = !!this.$_audio;
+                    this.hasAudio = !!this.$_audio && !!templateData.audio;
                     console.log("Audio available:", this.hasAudio, "Path:", this.audioPath);
-                    
-                    if (this.hasAudio && this.$_audio) {
-                        try {
-                            this.$_audio = new Audio(this.audioPath);
-                            this.$_audio.preload = "auto";
-                            
-                            // Add event listeners for debugging
-                            this.$_audio.addEventListener('canplay', () => {
-                                console.log("Audio can play now");
-                            });
-                            
-                            this.$_audio.addEventListener('error', (e) => {
-                                console.error("Audio error:", e);
-                                console.error("Audio error code:", this.$_audio.error ? this.$_audio.error.code : "unknown");
-                                this.hasAudio = false; // Disable audio functionality if error
-                            });
-                            
-                            console.log("Audio element created");
-                        } catch (err) {
-                            console.error("Error creating audio element:", err);
-                            this.hasAudio = false;
-                        }
-                    }
                     
                     // Use combined and sorted events list
                     this.allEvents = allEvents;
                     
                     // Use only click points for interaction
-                    this.clickPoints = apiData.metadata.points;
+                    this.clickPoints = clickPoints;
 
                     this.startTime = this.recordingData.startTime;
                     this.endTime = this.recordingData.endTime;
-                    this.duration = this.endTime - this.startTime;
+                    this.duration = this.endTime - this.startTime || 60000; // Default 1 minute if no recording data
 
-                    // Use relative paths for images directly without concatenating with BASE_URL
-                    this.images = images;
+                    // Use the display images for showing in the UI
+                    this.images = displayImages;
                     this.activeImageIndex = 0;
                     this.$_aside = document.querySelector(asideSelector);
                     this.$_figure = document.querySelector(figureSelector);
@@ -401,17 +388,15 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     this.currentPlaybackTime = 0;
                     
                     // Calculate total duration from the actual recording duration
-                    this.totalDuration = (this.recordingData.endTime - this.recordingData.startTime) / 1000;
+                    this.totalDuration = (this.recordingData.endTime - this.recordingData.startTime) / 1000 || 60; // Default 60s
                     
-                    // Create a timeline based on all events for smooth transitions
-                    this.timelinePoints = this.allEvents
-                        .filter(event => event.screenshot || event.type === 'click') // Only include events with screenshots or clicks
-                        .map((event, index) => ({
-                            time: event.relativeTime / 1000, // Convert to seconds
-                            imageIndex: index,
-                            eventType: event.type || (event.key ? 'keyboard' : 'click'),
-                            originalEvent: event
-                        }));
+                    // Create a timeline based on slide timestamps
+                    this.timelinePoints = this.slideData.map((slide, index) => ({
+                        time: (slide.timeStamp - this.recordingData.startTime) / 1000, // Convert to seconds
+                        imageIndex: index,
+                        eventType: 'slide',
+                        originalEvent: { ...slide, relativeTime: slide.timeStamp - this.recordingData.startTime }
+                    }));
 
                     // Sort timeline points by time
                     this.timelinePoints.sort((a, b) => a.time - b.time);
@@ -434,37 +419,23 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                 }
 
                 renderAside() {
-                    // Filter to include only items with screenshots or click points
-                    const renderItems = this.allEvents.filter(event => event.screenshot || event.type === 'click');
-                    
-                    this.$_aside.innerHTML = renderItems
-                        .map((event, index) => {
-                            const timestamp = event.time
-                                ? new Date(event.time).toLocaleTimeString()
-                                : "";
-                            
-                            let title = '';
-                            let coords = '';
-                            
-                            if (event.type === 'click' || event.button) {
-                                title = \`Click \${index + 1}\`;
-                                coords = \`(\${Math.round(event.x)}, \${Math.round(event.y)})\`;
-                            } else if (event.key) {
-                                title = \`Key: \${event.key}\`;
-                                coords = '';
-                            }
-
+                    // Render aside using slideData directly
+                    this.$_aside.innerHTML = this.slideData
+                        .map((slide, index) => {
                             return \`
                             <div class="aside_container_section \${
                                 index === this.activeImageIndex ? "active" : ""
                             }" data-index="\${index}">
                                 <figure>
-                                    <img src="\${this.images[index] || this.images[0]}" alt="Image \${index}" />
+                                    <img src="\${slide.displayImage}" alt="Image \${index + 1}" />
                                 </figure>
-                                <div>
-                                    <p>\${title}: \${coords}</p>
-                                    <p><small>\${timestamp}</small></p>
-                                </div>
+                                <section>
+                                    <h3>
+                                        <span class="index">\${index + 1}). </span>
+                                        \${new Date(slide.timeStamp).toLocaleTimeString()}
+                                    </h3>
+                                    <div class="note-text">\${slide.text || 'No notes'}</div>
+                                </section>
                             </div>\`;
                         })
                         .join("");
@@ -489,12 +460,16 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                         target.classList.add("active");
 
                         const index = parseInt(target.dataset.index);
+                        this.updateFigure(index);
 
-                        // When clicking a slide, update the timeline to that time
-                        const clickPoint = this.clickPoints[index];
-                        if (clickPoint) {
-                            const time = clickPoint.relativeTime / 1000;
+                        // When clicking a slide, update the timeline
+                        const slide = this.slideData[index];
+                        if (slide && this.recordingData) {
+                            const time = (slide.timeStamp - this.recordingData.startTime) / 1000;
 
+                            // Update progress bar to match the time of this slide
+                            this.updateProgressBarByTime(time);
+                            
                             // If playing, update playback time
                             if (this.isPlaying) {
                                 this.currentPlaybackTime = time;
@@ -511,12 +486,7 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                                     this.currentPlaybackTime = time;
                                 }
                             }
-
-                            // Update progress bar to match the time of this slide
-                            this.updateProgressBarByTime(time);
                         }
-
-                        this.updateFigure(index);
                     });
                     
                     // Add speed selector change event listener
@@ -555,6 +525,8 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
 
                 updateFigure(index) {
                     this.activeImageIndex = parseInt(index);
+                    if (!this.slideData[this.activeImageIndex]) return;
+                    
                     this.$_figure_img.src = this.images[index];
                     this.$_figure_img.alt = \`Image \${index}\`;
 
@@ -679,7 +651,7 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                             // Set volume based on UI state
                             this.$_audio.volume = this.muted ? 0 : this.volume / 100;
                             
-                            // Play audio with user interaction context (should work since this is called from a click handler)
+                            // Play audio with user interaction context
                             const playPromise = this.$_audio.play();
                             if (playPromise !== undefined) {
                                 playPromise.then(() => {
@@ -753,9 +725,9 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
 
                 // Get current playback time based on image index
                 getCurrentTimeFromIndex(index) {
-                    const event = this.timelinePoints[index]?.originalEvent;
-                    if (event) {
-                        return event.relativeTime / 1000;
+                    const slide = this.slideData[index];
+                    if (slide && this.recordingData) {
+                        return (slide.timeStamp - this.recordingData.startTime) / 1000;
                     }
                     return 0;
                 }
@@ -792,7 +764,7 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     const progressPercentage = (time / this.totalDuration) * 100;
                     this.$_timelineProgress.style.width = \`\${progressPercentage}%\`;
 
-                    // Update time display, apply offset correction
+                    // Update time display
                     const currentTime = this.formatTime(time);
                     const totalTime = this.formatTime(this.totalDuration);
                     document.querySelector(
@@ -832,11 +804,13 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                         this.playbackStartTime = Date.now();
                     }
 
-                    // Update timeline to reflect the current slide
-                    const clickPoint = this.clickPoints[index];
-                    if (clickPoint) {
-                        this.updateProgressBarByTime(clickPoint.relativeTime / 1000);
+                    // Hide feedback tooltip when changing slides
+                    if (this.$_feedbackTooltip) {
+                        this.$_feedbackTooltip.classList.remove('visible');
                     }
+
+                    // Update timeline progress
+                    this.updateProgressBar();
                 }
 
                 nextSlide() {
@@ -888,17 +862,9 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                 }
 
                 updateProgressBar() {
-                    if (this.clickPoints && this.clickPoints.length > 0) {
-                        const clickPoint = this.clickPoints[this.activeImageIndex];
-                        if (clickPoint) {
-                            this.updateProgressBarByTime(clickPoint.relativeTime / 1000);
-                        }
-                    } else {
-                        // Fall back to the original calculation
-                        const progressPercentage =
-                            (this.activeImageIndex / (this.images.length - 1)) * 100;
-                        this.$_timelineProgress.style.width = \`\${progressPercentage}%\`;
-                    }
+                    // Use the current slide's timestamp for progress
+                    const currentTime = this.getCurrentTimeFromIndex(this.activeImageIndex);
+                    this.updateProgressBarByTime(currentTime);
                 }
 
                 // Format time for display
@@ -933,59 +899,55 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     const xPercent = x / rect.width;
                     const yPercent = y / rect.height;
                     
-                    // Convert to screen coordinates
-                    const screenX = xPercent * this.recordingData.screenSize.width;
-                    const screenY = yPercent * this.recordingData.screenSize.height;
+                    // Get the correct expected coordinates from current slide
+                    const currentSlide = this.slideData[this.activeImageIndex];
+                    if (!currentSlide) return;
                     
-                    // Get the expected click point for the current image
-                    // Since we're using a combined timeline, we need to find the actual click point
-                    let expectedPoint = null;
+                    // Extract coordinates from the current slide's filename
+                    let expectedX = 0, expectedY = 0;
+                    const filename = currentSlide.image || '';
+                    const match = filename.match(/click_\\d+_([0-9.]+)_([0-9.]+)\\.png$/);
                     
-                    // Try to find corresponding click point in the original clickPoints array
-                    const timelinePoint = this.timelinePoints[this.activeImageIndex];
-                    if (timelinePoint && timelinePoint.eventType === 'click') {
-                        expectedPoint = timelinePoint.originalEvent;
+                    if (match && match.length === 3) {
+                        // Use coordinates from filename
+                        expectedX = parseFloat(match[1]);
+                        expectedY = parseFloat(match[2]);
                     } else {
-                        // If it's not a click event, use the nearest click point
-                        const activeImage = this.images[this.activeImageIndex];
-                        const imageNum = activeImage.match(/\\d+/);
-                        if (imageNum && this.clickPoints[parseInt(imageNum[0]) - 1]) {
-                            expectedPoint = this.clickPoints[parseInt(imageNum[0]) - 1];
-                        }
+                        // Default to center of image if no coordinates found
+                        expectedX = this.recordingData.screenSize.width / 2;
+                        expectedY = this.recordingData.screenSize.height / 2;
                     }
                     
-                    // Check if click is within tolerance
-                    const isCorrect = expectedPoint ? 
-                        this.isClickCorrect(screenX, screenY, expectedPoint) : 
-                        false;
+                    // Convert expected coordinates to percentage of screen
+                    const expectedXPercent = expectedX / this.recordingData.screenSize.width;
+                    const expectedYPercent = expectedY / this.recordingData.screenSize.height;
+                    
+                    // Calculate distance between actual click and expected position (in percentage space)
+                    const distance = Math.sqrt(
+                        Math.pow(xPercent - expectedXPercent, 2) + 
+                        Math.pow(yPercent - expectedYPercent, 2)
+                    );
+                    
+                    // Determine if click is correct (within tolerance)
+                    const tolerance = 0.05; // 5% of the image
+                    const isCorrect = distance <= tolerance;
                     
                     // Show feedback tooltip
                     this.showFeedback(isCorrect, x, y);
                     
-                    // Move to next slide after a delay, regardless of right/wrong
-                    setTimeout(() => {
-                        this.nextSlide();
-                    }, 1000);
-                }
-                
-                isClickCorrect(clickX, clickY, expectedPoint) {
-                    if (!expectedPoint) return false;
-                    
-                    // Calculate distance between clicked point and expected point
-                    const distance = Math.sqrt(
-                        Math.pow(clickX - expectedPoint.x, 2) + 
-                        Math.pow(clickY - expectedPoint.y, 2)
-                    );
-                    
-                    // Return true if within tolerance
-                    return distance <= this.clickTolerance;
+                    // Move to next slide after a delay if correct
+                    if (isCorrect) {
+                        setTimeout(() => {
+                            this.nextSlide();
+                        }, 800);
+                    }
                 }
                 
                 showFeedback(isCorrect, x, y) {
                     if (!this.$_feedbackTooltip) return;
                     
                     // Set tooltip text and class
-                    this.$_feedbackTooltip.textContent = isCorrect ? 'Correct!' : 'Wrong!';
+                    this.$_feedbackTooltip.textContent = isCorrect ? 'Correct!' : 'Try again';
                     this.$_feedbackTooltip.className = 'feedback-tooltip ' + (isCorrect ? 'correct' : 'wrong');
                     
                     // Position tooltip near click position
@@ -998,18 +960,18 @@ export const testHtml = async (response: IResponse, zip: JSZip) => {
                     // Hide tooltip after delay
                     setTimeout(() => {
                         this.$_feedbackTooltip.classList.remove('visible');
-                    }, 900); // Slightly shorter than next slide delay
+                    }, 1500);
                 }
             }
 
-            // Initialize with the modified data
+            // Initialize with the slide data
             document.addEventListener("DOMContentLoaded", function() {
                 new TestHtml(
                     BASE_URL,
-                    left_images,
+                    slideData,
                     "aside .aside_container",
                     "figure",
-                    apiResponse
+                    templateData.metadata
                 );
             });
         </script>

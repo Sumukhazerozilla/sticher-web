@@ -1,17 +1,29 @@
 import JSZip from "jszip";
-import { IResponse } from "../types";
+import { IResponse, ISlideData } from "../types";
 
-export const demoHtml = async (response: IResponse, zip: JSZip) => {
-  console.log("Demo HTML function called", response);
-  // Create a modified response with updated image paths pointing to annotated images
-  const modifiedResponse = {
-    ...response,
-    images: response.images.map((_, index) => {
-      // Use the annotated images from the annotated_images folder
-      return `./annotated_images/image_${index + 1}.png`;
-    }),
+export const demoHtml = async (
+  slideData: ISlideData[],
+  response: IResponse | null,
+  zip: JSZip
+) => {
+  console.log("Demo HTML function called", slideData);
+
+  //   // Create paths to annotated images for the HTML template
+  //   const annotatedImages = slideData.map((_, index) => {
+  //     return `./annotated_images/image_${index + 1}.png`;
+  //   });
+
+  // Create a modified structure combining slideData with additional info from response
+  const templateData = {
+    slideData: slideData.map((slide, index) => ({
+      ...slide,
+      // Use annotated images for display
+      displayImage: `./annotated_images/image_${index + 1}.png`,
+    })),
+    // Include necessary metadata from response
+    metadata: response?.metadata,
     // Point to the local audio file in the zip
-    audio: response.audio ? "./audio.mp3" : null,
+    audio: response?.audio ? "./audio.mp3" : null,
   };
 
   const template = `
@@ -64,39 +76,58 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                 gap: 10px;
                 height: calc(85vh - 60px);
             }
+            /* Left Section styles updated to match current component */
             .aside_container {
                 display: flex;
                 flex-direction: column;
-                gap: 5px;
+                gap: 8px;
                 height: 85vh;
                 overflow-y: auto;
                 padding-bottom: 2rem;
             }
             .aside_container_section {
                 display: grid;
-                grid-template-columns: 120px 1fr;
+                grid-template-columns: 100px 1fr;
                 align-items: center;
                 gap: 10px;
-                background-color: rgb(245, 245, 245);
+                background-color: #ffffff;
                 cursor: pointer;
-                border-radius: 5px;
-                margin-bottom: 8px;
-                padding: 5px;
-                border-left: 3px solid transparent;
+                border-radius: 3px;
+                margin-bottom: 4px;
+                border: 1px solid #e5e7eb;
                 transition: all 0.2s ease;
             }
-            .aside_container_section img {
-                border-radius: 3px;
-                aspect-ratio: 3/2;
-            }
-            .aside_container_section p {
-                font-size: 0.8rem;
-            }
             .aside_container_section.active {
-                background-color: rgb(138, 227, 241);
-                color: #333;
-                border-left: 3px solid #0066cc;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                background-color: #e5e7eb;
+            }
+            .aside_container_section figure img {
+                width: 96px;
+                height: 96px;
+                object-fit: cover;
+            }
+            .aside_container_section section {
+                padding: 8px;
+                position: relative;
+            }
+            .aside_container_section h3 {
+                font-size: 14px;
+                margin-top: 4px;
+            }
+            .aside_container_section h3 span.index {
+                font-weight: bold;
+            }
+            .aside_container_section textarea {
+                width: 100%;
+                border: none;
+                outline: 1px solid transparent;
+                font-size: 14px;
+                padding: 4px;
+                margin-top: 4px;
+                background-color: transparent;
+                resize: none;
+            }
+            .aside_container_section textarea:focus {
+                outline: 1px solid #a3a3a3;
             }
             /* Cursor style */
             .cursor {
@@ -281,26 +312,29 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
             // Use relative paths instead of server URL
             const BASE_URL = "";
 
-            // API Response data with paths pointing to annotated images
-            const apiResponse = ${JSON.stringify(modifiedResponse)};
-
-            // Use annotated images from API response
-            const left_images = apiResponse.images;
-
-            // Get recording metadata for accurate timeline
-            const recordingData = apiResponse.metadata.lastRecording;
+            // Template data with slideData and necessary response elements
+            const templateData = ${JSON.stringify(templateData)};
+            
+            // Access slide data directly
+            const slideData = templateData.slideData;
+            
+            // Use annotated images for display
+            const displayImages = slideData.map(slide => slide.displayImage);
+            
+            // Get recording metadata from response
+            const recordingData = templateData.metadata.lastRecording;
             
             // Debug audio path 
-            console.log("Audio path in HTML:", "./audio.mp3");
+            console.log("Audio path in HTML:", templateData.audio);
             
             // Combine click points and keyboard events for a unified timeline
             const allEvents = [
-                ...apiResponse.metadata.points.map(point => ({
+                ...templateData.metadata.points.map(point => ({
                     ...point,
                     type: 'click',
                     relativeTime: point.time - recordingData.startTime
                 })),
-                ...apiResponse.metadata.keyboardEvents.map(event => ({
+                ...templateData.metadata.keyboardEvents.map(event => ({
                     ...event,
                     relativeTime: event.time - recordingData.startTime
                 }))
@@ -310,13 +344,13 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
             allEvents.sort((a, b) => a.relativeTime - b.relativeTime);
             
             // Get cursor movement data
-            const cursorMovements = apiResponse.metadata?.cursorMovement?.movements || [];
+            const cursorMovements = templateData.metadata?.cursorMovement?.movements || [];
 
             class DemoHtml {
-                constructor(baseUrl, images, asideSelector, figureSelector, apiData) {
+                constructor(baseUrl, slideData, asideSelector, figureSelector, metadata) {
                     this.BASE_URL = baseUrl;
-                    this.apiData = apiData;
-                    this.recordingData = apiData.metadata.lastRecording;
+                    this.slideData = slideData;
+                    this.recordingData = metadata.lastRecording;
                     
                     // Audio setup
                     this.$_audio = document.getElementById('recording-audio');
@@ -344,16 +378,16 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                     this.allEvents = allEvents;
                     
                     // Extract only click points for backwards compatibility
-                    this.clickPoints = apiData.metadata.points;
+                    this.clickPoints = metadata.points;
                     
-                    this.cursorMovements = apiData.metadata?.cursorMovement?.movements || [];
+                    this.cursorMovements = metadata?.cursorMovement?.movements || [];
 
                     this.startTime = this.recordingData.startTime;
                     this.endTime = this.recordingData.endTime;
                     this.duration = this.endTime - this.startTime;
 
-                    // Use relative paths for images directly without concatenating with BASE_URL
-                    this.images = images;
+                    // Use the display images (annotated) for showing in the UI
+                    this.images = displayImages;
                     this.activeImageIndex = 0;
                     this.$_aside = document.querySelector(asideSelector);
                     this.$_figure = document.querySelector(figureSelector);
@@ -520,37 +554,23 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                 }
 
                 renderAside() {
-                    // Filter to include only items with screenshots or click points
-                    const renderItems = this.allEvents.filter(event => event.screenshot || event.type === 'click');
-                    
-                    this.$_aside.innerHTML = renderItems
-                        .map((event, index) => {
-                            const timestamp = event.time
-                                ? new Date(event.time).toLocaleTimeString()
-                                : "";
-                            
-                            let title = '';
-                            let coords = '';
-                            
-                            if (event.type === 'click' || event.button) {
-                                title = \`Click \${index + 1}\`;
-                                coords = \`(\${Math.round(event.x)}, \${Math.round(event.y)})\`;
-                            } else if (event.key) {
-                                title = \`Key: \${event.key}\`;
-                                coords = '';
-                            }
-
+                    // Render aside using slideData directly
+                    this.$_aside.innerHTML = this.slideData
+                        .map((slide, index) => {
                             return \`
                             <div class="aside_container_section \${
                                 index === this.activeImageIndex ? "active" : ""
                             }" data-index="\${index}">
                                 <figure>
-                                    <img src="\${this.images[index] || this.images[0]}" alt="Image \${index}" />
+                                    <img src="\${slide.displayImage}" alt="Image \${index + 1}" />
                                 </figure>
-                                <div>
-                                    <p>\${title}: \${coords}</p>
-                                    <p><small>\${timestamp}</small></p>
-                                </div>
+                                <section>
+                                    <h3>
+                                        <span class="index">\${index + 1}). </span>
+                                        \${new Date(slide.timeStamp).toLocaleTimeString()}
+                                    </h3>
+                                    <div class="note-text">\${slide.text}</div>
+                                </section>
                             </div>\`;
                         })
                         .join("");
@@ -640,7 +660,9 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
 
                 updateFigure(index) {
                     this.activeImageIndex = parseInt(index);
-                    this.$_figure_img.src = this.images[index];
+                    if (!this.slideData[this.activeImageIndex]) return;
+                    
+                    this.$_figure_img.src = this.slideData[this.activeImageIndex].image;
                     this.$_figure_img.alt = \`Image \${index}\`;
 
                     // Update timeline progress when figure changes
@@ -1027,14 +1049,14 @@ export const demoHtml = async (response: IResponse, zip: JSZip) => {
                 }
             }
 
-            // Initialize with the modified data
+            // Initialize with the slide data
             document.addEventListener("DOMContentLoaded", function() {
                 new DemoHtml(
                     BASE_URL,
-                    left_images,
+                    slideData,
                     "aside .aside_container",
                     "figure",
-                    apiResponse
+                    templateData.metadata
                 );
             });
         </script>

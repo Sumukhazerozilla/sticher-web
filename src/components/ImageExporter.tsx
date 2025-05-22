@@ -1,34 +1,33 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { IResponse } from "./types";
-import { demoHtml } from "./templates/demo";
-import { testHtml } from "./templates/test"; // Import the testHtml function
+// import { IResponse } from "./types";
+// import { demoHtml } from "./templates/demo";
+// import { testHtml } from "./templates/test";
 import { BASE_URL } from "./constants";
 import axios from "axios";
+import useSticherStore from "../store/sticherStore";
+import { demoHtml, testHtml } from "./templates";
 
 interface ImageExporterProps {
-  fileMetaData: IResponse;
-  tooltips: { id: number; text: string }[];
   baseUrl: string;
 }
 
-const ImageExporter: React.FC<ImageExporterProps> = ({
-  fileMetaData,
-  tooltips,
-  baseUrl,
-}) => {
+const ImageExporter: React.FC<ImageExporterProps> = ({ baseUrl }) => {
+  const slideData = useSticherStore((state) => state.slideData);
+  const fileMetaData = useSticherStore((state) => state.response);
+
   const handleExportBtn = async () => {
     try {
       const zip = new JSZip();
 
       // First, export the original images to the resources folder
-      await exportImagesToZip(zip, fileMetaData);
+      await exportImagesToZip(zip);
 
       // Then, create the annotated images
       await addAnnotatedImageToZip(zip);
 
       // Store the audio file if it exists
-      if (fileMetaData.audio) {
+      if (fileMetaData?.audio) {
         try {
           console.log(
             "Downloading audio from:",
@@ -58,8 +57,8 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
       }
 
       // Finally, create the HTML files after all resources are available
-      await demoHtml(fileMetaData, zip);
-      await testHtml(fileMetaData, zip);
+      await demoHtml(slideData, fileMetaData, zip);
+      await testHtml(slideData, fileMetaData, zip);
 
       // Generate and save the zip file
       const content = await zip.generateAsync({ type: "blob" });
@@ -70,20 +69,20 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
     }
   };
 
-  async function exportImagesToZip(zip: JSZip, response: IResponse) {
+  async function exportImagesToZip(zip: JSZip) {
     // Create a resource folder for images
     const resourceFolder = zip.folder("resources") || zip;
     // Download and add each image to the ZIP
-    for (const imagePath of response.images) {
+    for (const slide of slideData) {
       try {
-        const imageUrl = `${BASE_URL}${imagePath}`;
+        const imageUrl = `${BASE_URL}${slide?.image}`;
         const imageResponse = await axios.get(imageUrl, {
           responseType: "arraybuffer",
         });
-        const imageFileName = imagePath.split("/").pop() || "image.png";
+        const imageFileName = slide?.image?.split("/").pop() || "image.png";
         resourceFolder.file(imageFileName, imageResponse.data);
       } catch (error) {
-        console.error(`Failed to fetch image: ${imagePath}`, error);
+        console.error(`Failed to fetch image: ${slide}`, error);
       }
     }
   }
@@ -91,21 +90,27 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
   async function addAnnotatedImageToZip(zip: JSZip) {
     const taggedImageFolder = zip.folder("annotated_images") || zip;
 
-    // For each image in the file metadata
-    for (let i = 0; i < fileMetaData.images.length; i++) {
+    // For each image in the slide data
+    for (let i = 0; i < slideData.length; i++) {
       try {
-        const imageUrl = `${baseUrl}${fileMetaData.images[i]}`;
-        const tooltipText = tooltips[i]?.text || `Note ${i + 1}`;
+        // Skip if slide data is missing
+        if (!slideData[i]) {
+          console.log(`Skipping image ${i + 1}: No slide data available`);
+          continue;
+        }
 
-        // Find the corresponding point or use a default
-        const pointIndex = Math.min(i, fileMetaData.metadata.points.length - 1);
-        const point =
-          pointIndex >= 0 ? fileMetaData.metadata.points[pointIndex] : null;
+        const imageUrl = `${baseUrl}${slideData[i].image}`;
+        const tooltipText = slideData[i].text || `Note ${i + 1}`;
+
+        console.log(`Processing image ${i + 1}: ${slideData[i].image}`);
 
         // Create canvas with image and tooltip
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-        if (!ctx) continue;
+        if (!ctx) {
+          console.error(`Failed to get canvas context for image ${i + 1}`);
+          continue;
+        }
 
         // Load the image
         const img = await loadImage(imageUrl);
@@ -115,39 +120,22 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
         // Draw the image
         ctx.drawImage(img, 0, 0);
 
-        // Extract coordinates from the filename or use defaults
-        const filename = fileMetaData.images[i];
-        const match = filename.match(/click_\d+_([0-9.]+)_([0-9.]+)\.png$/);
+        // Extract coordinates using the same priority logic as in SticherView
+        const filename = slideData[i].image || "";
         let x, y;
 
+        // First priority: Extract coordinates from filename if available
+        const match = filename.match(/click_\d+_([0-9.]+)_([0-9.]+)\.png$/);
         if (match && match.length === 3) {
-          // First priority: Use coordinates from filename
           x = parseFloat(match[1]);
           y = parseFloat(match[2]);
           console.log(`Using filename coordinates for image ${i + 1}:`, {
             x,
             y,
           });
-        } else if (point?.domBounds) {
-          // Second priority: Use domBounds if available
-          x = point.domBounds.x + point.domBounds.width / 2;
-          y = point.domBounds.y + point.domBounds.height / 2;
-          console.log(`Using domBounds coordinates for image ${i + 1}:`, {
-            x,
-            y,
-            bounds: point.domBounds,
-          });
-        } else if (
-          point &&
-          typeof point.x === "number" &&
-          typeof point.y === "number"
-        ) {
-          // Third priority: Use point.x and point.y if available
-          x = point.x;
-          y = point.y;
-          console.log(`Using point coordinates for image ${i + 1}:`, { x, y });
-        } else {
-          // Fallback to center of image if no coordinates are available
+        }
+        // Use center of image as fallback
+        else {
           x = img.width / 2;
           y = img.height / 2;
           console.log(`Using default center coordinates for image ${i + 1}:`, {
@@ -156,7 +144,7 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
           });
         }
 
-        // Draw the tooltip
+        // Draw the tooltip with the text from the slide data
         drawTooltip(ctx, x, y, tooltipText);
 
         // Convert canvas to blob and add to zip
@@ -165,6 +153,7 @@ const ImageExporter: React.FC<ImageExporterProps> = ({
         );
 
         taggedImageFolder.file(`image_${i + 1}.png`, blob);
+        console.log(`Successfully added annotated image ${i + 1} to zip`);
       } catch (error) {
         console.error(`Failed to process image ${i + 1}:`, error);
         // Continue with next image instead of stopping the entire process

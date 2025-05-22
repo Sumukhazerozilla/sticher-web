@@ -7,6 +7,7 @@ import { IResponse, ISlideData } from "./components/types";
 import axios from "axios";
 import useSticherStore from "./store/sticherStore";
 import { nanoid } from "nanoid";
+import ImageExporter from "./components/ImageExporter";
 
 function App() {
   const setSlideData = useSticherStore((state) => state.setSlideData);
@@ -99,13 +100,7 @@ function App() {
           <div className="flex items-center justify-end gap-2">
             <UploadButton onFileUpload={onFileUpload} />
             <div>
-              {/* {data && (
-                <ImageExporter
-                  fileMetaData={data}
-                  tooltips={tooltips}
-                  baseUrl={BASE_URL}
-                />
-              )} */}
+              <ImageExporter baseUrl={BASE_URL} />
             </div>
           </div>
           <section>

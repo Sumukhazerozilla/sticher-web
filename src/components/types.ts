@@ -6,12 +6,6 @@ export interface IPoint {
   time: number;
   button: number;
   relativeTime: number;
-  domBounds: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
 }
 
 export interface IMetadata {

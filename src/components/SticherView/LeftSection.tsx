@@ -1,4 +1,4 @@
-import { AiFillDelete } from "react-icons/ai";
+// import { AiFillDelete } from "react-icons/ai";
 import { BASE_URL } from "../constants";
 import useSticherStore from "../../store/sticherStore";
 import TextArea from "./TextArea";
@@ -52,12 +52,12 @@ const LeftSection: React.FC = () => {
             </figure>
 
             <section className="relative p-2">
-              <button
+              {/* <button
                 className="text-red-500 border p-1 rounded-full hover:text-red-700 absolute top-1 right-1 "
                 // onClick={handleDeleteImage(image)}
               >
                 <AiFillDelete size={12} />
-              </button>
+              </button> */}
 
               <div className="mt-1">
                 <h3 className="text-sm ">
