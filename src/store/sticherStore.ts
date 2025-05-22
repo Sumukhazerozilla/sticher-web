@@ -1,8 +1,12 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { IResponse, ISlideData } from "../components/types";
+import { ActiveScreenType } from "../types/common";
 
 interface SticherStore {
+  activeScreen: ActiveScreenType;
+  setActiveScreen: (screen: ActiveScreenType) => void;
+
   activeImageIndex: number;
   setActiveImageIndex: (index: number) => void;
 
@@ -20,6 +24,9 @@ interface SticherStore {
 const useSticherStore = create<SticherStore>()(
   devtools(
     (set) => ({
+      activeScreen: "upload",
+      setActiveScreen: (screen) => set({ activeScreen: screen }),
+
       activeImageIndex: 0,
       setActiveImageIndex: (index) => set({ activeImageIndex: index }),
 
