@@ -10,10 +10,12 @@ export const testHtml = async (
 
   // Create a modified structure combining slideData with additional info from response
   const templateData = {
-    slideData: slideData.map((slide, index) => ({
+    slideData: slideData.map((slide) => ({
       ...slide,
       // Use resources images for display
-      displayImage: `./resources/${slide.image.split("/").pop() || "image.png"}`,
+      displayImage: `./resources/${
+        slide.image.split("/").pop() || "image.png"
+      }`,
     })),
     // Include necessary metadata from response
     metadata: response?.metadata,
@@ -935,12 +937,11 @@ export const testHtml = async (
                     // Show feedback tooltip
                     this.showFeedback(isCorrect, x, y);
                     
-                    // Move to next slide after a delay if correct
-                    if (isCorrect) {
-                        setTimeout(() => {
-                            this.nextSlide();
-                        }, 800);
-                    }
+                    // Move to next slide after a delay regardless of whether the click was correct or not
+                    // Use a slightly longer delay for incorrect clicks to give user time to see feedback
+                    setTimeout(() => {
+                        this.nextSlide();
+                    }, isCorrect ? 800 : 1500);
                 }
                 
                 showFeedback(isCorrect, x, y) {
