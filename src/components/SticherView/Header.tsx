@@ -1,3 +1,5 @@
+import useSticherStore from '../../store/sticherStore';
+import { goToUploadScreen } from '../../utils/common';
 import { palette } from '../../utils/palette';
 import { SticherHeaderIdTypes, sticherHeaderOptions } from './utils';
 
@@ -7,6 +9,8 @@ interface SticherHeaderProps {
 }
 
 const SticherHeader: React.FC<SticherHeaderProps> = ({ activeHeaderOption, onHeaderOptionClick }) => {
+  const setActiveScreen = useSticherStore((state) => state.setActiveScreen);
+
   return (
     <nav className="bg-white boxShadow rounded-lg py-4 px-6 grid gap-2" style={{ gridTemplateColumns: '1fr 2px 180px' }}>
       <div className="flex items-center justify-between gap-2">
@@ -37,6 +41,11 @@ const SticherHeader: React.FC<SticherHeaderProps> = ({ activeHeaderOption, onHea
       <div className="flex items-center justify-between gap-2">
         {sticherHeaderOptions.slice(-2).map((option) => (
           <button
+            onClick={() => {
+              if (option.id === 'import') {
+                goToUploadScreen(setActiveScreen);
+              }
+            }}
             className="flex items-center cursor-pointer border  py-[6px] px-2 rounded-md"
             style={{
               borderColor: palette.primaryLight,
