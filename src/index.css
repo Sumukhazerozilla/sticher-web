@@ -4,3 +4,29 @@
 .loader {
   @apply w-12 h-12 border-4 border-t-4 border-t-blue-500 border-gray-200 rounded-full animate-spin;
 }
+
+.boxShadow {
+  box-shadow: -45px 353px 100px 0px rgba(0, 60, 97, 0),
+    -29px 226px 91px 0px rgba(0, 60, 97, 0.01),
+    -16px 127px 77px 0px rgba(0, 60, 97, 0.05),
+    -7px 57px 57px 0px rgba(0, 60, 97, 0.09),
+    -2px 14px 31px 0px rgba(0, 60, 97, 0.1);
+}
+
+.sticherView {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1rem;
+}
+
+.sticherView::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.2;
+  background: #1e88e5;
+  filter: blur(240px);
+  height: 100%;
+  width: 100%;
+  z-index: -1;
+}

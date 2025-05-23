@@ -52,13 +52,6 @@ const LeftSection: React.FC = () => {
             </figure>
 
             <section className="relative p-2">
-              {/* <button
-                className="text-red-500 border p-1 rounded-full hover:text-red-700 absolute top-1 right-1 "
-                // onClick={handleDeleteImage(image)}
-              >
-                <AiFillDelete size={12} />
-              </button> */}
-
               <div className="mt-1">
                 <h3 className="text-sm ">
                   <span className="font-bold">{`${index + 1}). `}</span>

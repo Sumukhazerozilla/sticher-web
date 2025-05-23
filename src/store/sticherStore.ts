@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { devtools } from "zustand/middleware";
+import { devtools, persist, createJSONStorage } from "zustand/middleware";
 import { IResponse, ISlideData } from "../components/types";
 import { ActiveScreenType } from "../types/common";
 
@@ -23,31 +23,35 @@ interface SticherStore {
 
 const useSticherStore = create<SticherStore>()(
   devtools(
-    (set) => ({
-      activeScreen: "upload",
-      setActiveScreen: (screen) => set({ activeScreen: screen }),
+    persist(
+      (set) => ({
+        activeScreen: "upload",
+        setActiveScreen: (screen) => set({ activeScreen: screen }),
 
-      activeImageIndex: 0,
-      setActiveImageIndex: (index) => set({ activeImageIndex: index }),
+        activeImageIndex: 0,
+        setActiveImageIndex: (index) => set({ activeImageIndex: index }),
 
-      loading: true,
-      setLoading: (loading) => set({ loading }),
+        loading: false,
+        setLoading: (loading) => set({ loading }),
 
-      response: null,
-      setResponse: (response) => set({ response }),
+        response: null,
+        setResponse: (response) => set({ response }),
 
-      slideData: [],
-      setSlideData: (data) => set({ slideData: data }),
-      editSlideText: (id, text) =>
-        set((state) => ({
-          slideData: state.slideData.map((slide) =>
-            slide.id === id ? { ...slide, text } : slide
-          ),
-        })),
-    }),
-    {
-      name: "Sticher Store",
-    }
+        slideData: [],
+        setSlideData: (data) => set({ slideData: data }),
+        editSlideText: (id, text) =>
+          set((state) => ({
+            slideData: state.slideData.map((slide) =>
+              slide.id === id ? { ...slide, text } : slide
+            ),
+          })),
+      }),
+      {
+        name: "Sticher Store",
+        storage: createJSONStorage(() => sessionStorage),
+      }
+    ),
+    { name: "Sticher Store", store: "sticherStore" }
   )
 );
 
