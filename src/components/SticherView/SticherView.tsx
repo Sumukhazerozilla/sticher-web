@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
-import useSticherStore from "../../store/sticherStore";
-import { fetchFileData } from "../../utils/uploadOperations";
+import { useEffect, useState } from 'react';
+import useSticherStore from '../../store/sticherStore';
+import { fetchFileData } from '../../utils/uploadOperations';
 
-import SticherHeader from "./SticherHeader";
-import { SticherHeaderIdTypes } from "./utils";
+import SticherHeader from './Header';
+import { SticherHeaderIdTypes } from './utils';
+import SticherViewAside from './Aside';
 
 const SticherView = () => {
-  const fileId = new URLSearchParams(window.location.search).get("fileId");
-  const fetchFileId = fileId ? fileId : "";
+  const fileId = new URLSearchParams(window.location.search).get('fileId');
+  const fetchFileId = fileId ? fileId : '';
 
   const response = useSticherStore((state) => state.response);
   const slideData = useSticherStore((state) => state.slideData);
@@ -17,21 +18,14 @@ const SticherView = () => {
   const setResponse = useSticherStore((state) => state.setResponse);
   const setSlideData = useSticherStore((state) => state.setSlideData);
 
-  const [activeHeaderOption, setActiveHeaderOption] =
-    useState<SticherHeaderIdTypes | null>(null);
+  const [activeHeaderOption, setActiveHeaderOption] = useState<SticherHeaderIdTypes | null>(null);
 
   useEffect(() => {
     if (!response && !loading && slideData.length === 0) {
       if (fetchFileId) {
-        fetchFileData(
-          fetchFileId,
-          setLoading,
-          setActiveScreen,
-          setResponse,
-          setSlideData
-        );
+        fetchFileData(fetchFileId, setLoading, setActiveScreen, setResponse, setSlideData);
       } else {
-        setActiveScreen("upload");
+        setActiveScreen('upload');
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -43,12 +37,9 @@ const SticherView = () => {
 
   return (
     <main className="p-4 sticherView relative h-screen overflow-hidden">
-      <aside className="h-full bg-white boxShadow rounded-xl"></aside>
+      <SticherViewAside />
       <section>
-        <SticherHeader
-          activeHeaderOption={activeHeaderOption}
-          onHeaderOptionClick={onHeaderOptionClick}
-        />
+        <SticherHeader activeHeaderOption={activeHeaderOption} onHeaderOptionClick={onHeaderOptionClick} />
         <section className="bg-white boxShadow"></section>
       </section>
     </main>

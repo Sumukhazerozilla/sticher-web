@@ -1,11 +1,14 @@
-import { create } from "zustand";
-import { devtools, persist, createJSONStorage } from "zustand/middleware";
-import { IResponse, ISlideData } from "../components/types";
-import { ActiveScreenType } from "../types/common";
+import { create } from 'zustand';
+import { devtools, persist, createJSONStorage } from 'zustand/middleware';
+import { IResponse, ISlideData } from '../components/types';
+import { ActiveScreenType } from '../types/common';
 
 interface SticherStore {
   activeScreen: ActiveScreenType;
   setActiveScreen: (screen: ActiveScreenType) => void;
+
+  selectAll: boolean;
+  setSelectAll: (selectAll: boolean) => void;
 
   activeImageIndex: number;
   setActiveImageIndex: (index: number) => void;
@@ -25,8 +28,11 @@ const useSticherStore = create<SticherStore>()(
   devtools(
     persist(
       (set) => ({
-        activeScreen: "upload",
+        activeScreen: 'upload',
         setActiveScreen: (screen) => set({ activeScreen: screen }),
+
+        selectAll: false,
+        setSelectAll: (selectAll) => set({ selectAll, activeImageIndex: selectAll ? 0 : -1 }),
 
         activeImageIndex: 0,
         setActiveImageIndex: (index) => set({ activeImageIndex: index }),
@@ -41,18 +47,16 @@ const useSticherStore = create<SticherStore>()(
         setSlideData: (data) => set({ slideData: data }),
         editSlideText: (id, text) =>
           set((state) => ({
-            slideData: state.slideData.map((slide) =>
-              slide.id === id ? { ...slide, text } : slide
-            ),
+            slideData: state.slideData.map((slide) => (slide.id === id ? { ...slide, text } : slide)),
           })),
       }),
       {
-        name: "Sticher Store",
+        name: 'Sticher Store',
         storage: createJSONStorage(() => sessionStorage),
-      }
+      },
     ),
-    { name: "Sticher Store", store: "sticherStore" }
-  )
+    { name: 'Sticher Store', store: 'sticherStore' },
+  ),
 );
 
 export default useSticherStore;
