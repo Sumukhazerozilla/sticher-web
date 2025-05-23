@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import useSticherStore from '../../store/sticherStore';
 import { fetchFileData } from '../../utils/uploadOperations';
 
-import SticherHeader from './Header';
+import SticherHeader from './SticherViewHeader';
 import { SticherHeaderIdTypes } from './utils';
-import SticherViewAside from './Aside';
+import SticherViewAside from './SticherViewAside';
+import SticherViewArea from './SticherViewArea';
 
 const SticherView = () => {
   const fileId = new URLSearchParams(window.location.search).get('fileId');
@@ -40,7 +41,7 @@ const SticherView = () => {
       <SticherViewAside />
       <section>
         <SticherHeader activeHeaderOption={activeHeaderOption} onHeaderOptionClick={onHeaderOptionClick} />
-        <section className="bg-white boxShadow"></section>
+        <SticherViewArea activeHeaderOption={activeHeaderOption} />
       </section>
     </main>
   );
